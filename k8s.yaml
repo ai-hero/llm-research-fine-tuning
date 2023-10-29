@@ -1,0 +1,10 @@
+model_mount_path:
+dataset_mount_path:
+dataset_file:
+checkpoint_path:
+config_suffix: "config"
+peft_config_path:
+training_config_path:
+bnb_config_path:
+
+
