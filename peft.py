@@ -36,6 +36,8 @@ if __name__ == "__main__":
     model = AutoModelForCausalLM.from_pretrained(path["model_path"], quantization_config=bnb_config)
     model.config.use_cache = False
     tokenizer = AutoTokenizer.from_pretrained(path["model_path"])
+
+    #May need to have some custom padding logic here
     tokenizer.pad_token = tokenizer.eos_token
 
     if path["peft_config_path"] and os.path.isfile(os.path.join(path["peft_config_path"], path["config_suffix"])):
