@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bnb 
+data:
+  config: |
+    output_dir: checkpoint_path,
+    per_device_train_batch_size: 4
+    gradient_accumulation_steps: 4
+    optim: "paged_adamw_32bit"
+    save_steps: 10
+    logging_steps: 10
+    learning_rate: 2e-4
+    fp16: True
+    max_grad_norm: 0.3
+    max_steps: 500
+    warmup_ratio: 0.03
+    group_by_length: True
+    lr_scheduler_type: "constant"
+    gradient_checkpointing: True

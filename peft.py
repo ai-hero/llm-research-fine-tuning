@@ -6,17 +6,21 @@ from datasets import load_dataset
 from peft import LoraConfig
 from trl import SFTTrainer
 
+CONSTANT_MOUNT_PATH="/mnt/k8s.yaml"
+
 if __name__ == "__main__":
 
     # Note that default configurations are intended for falcoln 7B model
-
-    with open('k8s.yaml', 'r') as f:
+    k8s_yaml_path = "./k8s.yaml"
+    if os.path.isfile(CONSTANT_MOUNT_PATH):
+        k8s_yaml_path = CONSTANT_MOUNT_PATH
+    
+    with open(k8s_yaml_path, 'r') as f:
         path = yaml.safe_load(f)
 
     # Assumes dataset in csv files
     dataset = load_dataset("csv", data_files=os.path.join(path["dataset_mount_path"], path["dataset_file"]), split="train")
     dataset = dataset.shuffle()
-
 
     # temporarily disable logging to weights and biases
     os.environ["WANDB_DISABLED"] = "true"
@@ -33,9 +37,9 @@ if __name__ == "__main__":
         )
 
     # Assumes model is a causal language model
-    model = AutoModelForCausalLM.from_pretrained(path["model_path"], quantization_config=bnb_config)
+    model = AutoModelForCausalLM.from_pretrained(path["model_mount_path"], quantization_config=bnb_config)
     model.config.use_cache = False
-    tokenizer = AutoTokenizer.from_pretrained(path["model_path"])
+    tokenizer = AutoTokenizer.from_pretrained(path["model_mount_path"])
 
     #May need to have some custom padding logic here
     tokenizer.pad_token = tokenizer.eos_token
@@ -82,13 +86,14 @@ if __name__ == "__main__":
         )
 
 
+    # TODO : need to parametrize this
     max_seq_length = 512
 
     trainer = SFTTrainer(
         model=model,
         train_dataset=dataset,
         peft_config=peft_config,
-        dataset_text_field="text",
+        dataset_text_field=path["dataset_training_column"],
         max_seq_length=max_seq_length,
         tokenizer=tokenizer,
         args=training_config

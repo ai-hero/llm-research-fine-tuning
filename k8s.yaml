@@ -1,10 +1,14 @@
-model_mount_path:
-dataset_mount_path:
-dataset_file:
-checkpoint_path:
+model_mount_path: "/mnt/models"
+checkpoint_path: "/mnt/checkpoint"
+dataset_mount_path: "/mnt/datasets"
+dataset_file: "training_data.csv"
+dataset_column_name: "text"
+
+# Training Configuation
 config_suffix: "config"
-peft_config_path:
-training_config_path:
-bnb_config_path:
+dataset_training_column: "text"
+peft_config_path: "/mnt/configs/peft"
+training_config_path: "/mnt/configs/training"
+bnb_config_path: "/mnt/configs/bnb"
 
 
