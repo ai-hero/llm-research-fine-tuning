@@ -15,7 +15,10 @@ spec:
         image: finetuneresearch/peft:latest
         command:
         - python
-        - ./peft.py
+        - ./app.py
+        env:
+        - name: env
+          value: "test"
         volumeMounts:
           - mountPath: "/mnt/config/peft"
             name: peft-config
