@@ -22,8 +22,7 @@ if __name__ == "__main__":
     dataset = load_dataset("csv", data_files=os.path.join(path["dataset_mount_path"], path["dataset_file"]), split="train")
     dataset = dataset.shuffle()
 
-    # temporarily disable logging to weights and biases
-    os.environ["WANDB_DISABLED"] = "true"
+    #os.environ["WANDB_DISABLED"] = "true"
 
 
     if path["bnb_config_path"] and os.path.isfile(os.path.join(path["bnb_config_path"], path["config_suffix"])):

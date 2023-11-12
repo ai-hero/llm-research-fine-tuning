@@ -1,0 +1,36 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: peft-job
+spec:
+  completions: 1
+  parallelism: 1
+  completionMode: Indexed
+  template:
+    spec:
+      subdomain: peft-svc # has to match Service name
+      restartPolicy: Never
+      containers:
+      - name: peft
+        image: finetuneresearch/peft:latest
+        command:
+        - python
+        - ./peft.py
+        volumeMounts:
+          - mountPath: "/mnt/config/peft"
+            name: peft-config
+            readOnly: true
+          - mountPath: "/mnt/config/bnb"
+            name: bnb-config
+            readOnly: true
+          - mountPath: "/mnt/config/training"
+            name: training-config
+            readOnly: true
+          - mountPath: "/mnt/models" 
+            name: model
+            readOnly: true
+          - mountPath: "/mnt/checkpoint"
+            name: checkpoint
+          - mountPath: "/mnt/datasets"
+            name: dataset
+            readOnly: true
