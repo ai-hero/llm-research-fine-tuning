@@ -5,20 +5,23 @@ metadata:
 spec:
   completions: 1
   parallelism: 1
-  completionMode: Indexed
   template:
     spec:
       subdomain: peft-svc # has to match Service name
       restartPolicy: Never
       containers:
       - name: peft
-        image: finetuneresearch/peft:latest
+        image: shankarg87/finetuneresearch:1112_03
         command:
         - python
         - ./app.py
         env:
         - name: env
           value: "test"
+        - name: dataset_name
+          value: "sadmoseby/the-stack-yaml-k8s-annotated"
+        - name: dataset_training_column
+          value: summary
         volumeMounts:
           - mountPath: "/mnt/config/peft"
             name: peft-config
@@ -29,11 +32,13 @@ spec:
           - mountPath: "/mnt/config/training"
             name: training-config
             readOnly: true
-          - mountPath: "/mnt/models" 
-            name: model
-            readOnly: true
-          - mountPath: "/mnt/checkpoint"
-            name: checkpoint
-          - mountPath: "/mnt/datasets"
-            name: dataset
-            readOnly: true
+      volumes:
+        - name: peft-config
+          configMap:
+            name: peft
+        - name: bnb-config
+          configMap:
+            name: bnb
+        - name: training-config
+          configMap:
+            name: training

@@ -1,13 +1,25 @@
+# env configuration
+env: "test"
+
+# model specific configuration
+model_type: "hf" # either hf or disk
+model_name: ""
 model_mount_path: "/mnt/models"
 checkpoint_path: "/mnt/checkpoint"
+
+#dataset specific configuration
+dataset_type: "hf" # either hf or csv
+dataset_name: ""
 dataset_mount_path: "/mnt/datasets"
-dataset_file: "training_data.csv"
+dataset_training_column: "text"
 
 # Training Configuation
 config_suffix: "config"
-dataset_training_column: "text"
+
 peft_config_path: "/mnt/config/peft"
 training_config_path: "/mnt/config/training"
 bnb_config_path: "/mnt/config/bnb"
+
+
 
 
