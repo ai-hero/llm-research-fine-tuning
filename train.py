@@ -24,18 +24,15 @@ def fetch_dataset(bootstrap_config):
     return dataset, bootstrap_config["dataset_training_column"]
 
 def load_train_config(bootstrap_config):
-    if bootstrap_config["bnb_config_path"] and os.path.isfile(os.path.join(bootstrap_config["bnb_config_path"], bootstrap_config["config_suffix"])):
-        bnb_config_args = yaml.safe_load(os.path.join(bootstrap_config["bnb_config_path"], bootstrap_config["config_suffix"]))
-        bnb_config = BitsAndBytesConfig(**bnb_config_args)
-    else:
-        bnb_config = BitsAndBytesConfig(
+    bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_compute_dtype=torch.float16,
         )
 
     if bootstrap_config["peft_config_path"] and os.path.isfile(os.path.join(bootstrap_config["peft_config_path"], bootstrap_config["config_suffix"])):
-        peft_config_args = yaml.safe_load(os.path.join(bootstrap_config["peft_config_path"], bootstrap_config["config_suffix"]))
+        with open(os.path.join(bootstrap_config["peft_config_path"], bootstrap_config["config_suffix"]), "r") as f:
+            peft_config_args = yaml.safe_load(f)
         peft_config = LoraConfig(**peft_config_args)
     else:
         peft_config = LoraConfig(
@@ -54,8 +51,9 @@ def load_train_config(bootstrap_config):
 
     checkpoint_path = bootstrap_config["checkpoint_path"]
     if bootstrap_config["training_config_path"] and os.path.isfile(os.path.join(bootstrap_config["training_config_path"], bootstrap_config["config_suffix"])):
-        training_config_args = yaml.safe_load(os.path.join(bootstrap_config["training_config_path"], bootstrap_config["config_suffix"]))
-        training_config = TrainingArguments(output_dir = checkpoint_path, **training_config_args)
+        with open(os.path.join(bootstrap_config["training_config_path"], bootstrap_config["config_suffix"]), "r") as f:
+            training_config_args = yaml.safe_load(f)
+            training_config = TrainingArguments(output_dir = checkpoint_path, **training_config_args)
     else:
         training_config = TrainingArguments(
             output_dir=checkpoint_path,

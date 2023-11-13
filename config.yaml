@@ -3,13 +3,13 @@ env: "test"
 
 # model specific configuration
 model_type: "hf" # either hf or disk
-model_name: ""
+model_name: "tiiuae/falcon-7b"
 model_mount_path: "/mnt/models"
 checkpoint_path: "/mnt/checkpoint"
 
 #dataset specific configuration
 dataset_type: "hf" # either hf or csv
-dataset_name: ""
+dataset_name: "yahma/alpaca-cleaned"
 dataset_mount_path: "/mnt/datasets"
 dataset_training_column: "text"
 
