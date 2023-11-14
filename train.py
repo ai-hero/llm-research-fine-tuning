@@ -53,6 +53,7 @@ def load_train_config(bootstrap_config):
     if bootstrap_config["training_config_path"] and os.path.isfile(os.path.join(bootstrap_config["training_config_path"], bootstrap_config["config_suffix"])):
         with open(os.path.join(bootstrap_config["training_config_path"], bootstrap_config["config_suffix"]), "r") as f:
             training_config_args = yaml.safe_load(f)
+            training_config_args.pop("output_dir")
             training_config = TrainingArguments(output_dir = checkpoint_path, **training_config_args)
     else:
         training_config = TrainingArguments(
@@ -92,9 +93,9 @@ def do_train(dataset, train_column_name, model, tokenizer, train_run_config):
         model=model,
         train_dataset=dataset,
         peft_config=train_run_config["peft_config"],
-        dataset_text_field=train_run_config["dataset_training_column"],
+        dataset_text_field=train_column_name,
         max_seq_length=max_seq_length,
-        tokenizer=train_run_config["tokenizer"],
+        tokenizer=tokenizer,
         args=train_run_config["training_config"]
     )
 
