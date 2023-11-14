@@ -3,13 +3,13 @@ env: "test"
 
 # model specific configuration
 model_type: "hf" # either hf or disk
-model_name: ""
+model_name: "tiiuae/falcon-7b"
 model_mount_path: "/mnt/models"
 checkpoint_path: "/mnt/checkpoint"
 
 #dataset specific configuration
 dataset_type: "hf" # either hf or csv
-dataset_name: ""
+dataset_name: "heliosbrahma/mental_health_chatbot_dataset"
 dataset_mount_path: "/mnt/datasets"
 dataset_training_column: "text"
 
@@ -19,7 +19,3 @@ config_suffix: "config"
 peft_config_path: "/mnt/config/peft"
 training_config_path: "/mnt/config/training"
 bnb_config_path: "/mnt/config/bnb"
-
-
-
-

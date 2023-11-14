@@ -11,7 +11,7 @@ RUN apt-get update \
     git \
     git-lfs \
     tar \
-    # audio
+    vim \
     && apt-get clean autoremove --yes \
     && rm -rf /var/lib/{apt,dpkg,cache,log}
 
@@ -19,10 +19,11 @@ RUN apt-get update \
 WORKDIR /app
 
 # Copy the current directory contents into the container at /app
-COPY requirements.txt /app/custom_requirements.txt
+COPY requirements.txt requirements.txt
 
 # Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r /app/custom_requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . /app
 

@@ -11,23 +11,26 @@ spec:
       restartPolicy: Never
       containers:
       - name: peft
-        image: shankarg87/finetuneresearch:1112_03
+        image: rparundekar/fine_tune_research:latest
         command:
         - python
-        - ./app.py
+        - "./app.py"
+        ## OR
+        # - bash
+        # - "-c"
+        # - "sleep 3600"
         env:
-        - name: env
-          value: "test"
+        - name: WANDB_MODE
+          value: disabled 
+        - name: model_name
+          value: "tiiuae/falcon-7b"
         - name: dataset_name
-          value: "sadmoseby/the-stack-yaml-k8s-annotated"
+          value: "heliosbrahma/mental_health_chatbot_dataset"
         - name: dataset_training_column
-          value: summary
+          value: text
         volumeMounts:
           - mountPath: "/mnt/config/peft"
             name: peft-config
-            readOnly: true
-          - mountPath: "/mnt/config/bnb"
-            name: bnb-config
             readOnly: true
           - mountPath: "/mnt/config/training"
             name: training-config
@@ -36,9 +39,6 @@ spec:
         - name: peft-config
           configMap:
             name: peft
-        - name: bnb-config
-          configMap:
-            name: bnb
         - name: training-config
           configMap:
             name: training
