@@ -13,18 +13,21 @@ spec:
       - name: peft
         image: rparundekar/fine_tune_research:latest
         command:
-        - bash
-        - "-c"
-        - "sleep 3600"
+        - python
+        - "./app.py"
+        ## OR
+        # - bash
+        # - "-c"
+        # - "sleep 3600"
         env:
         - name: WANDB_MODE
           value: disabled 
-        # - name: model_name
-        #   value: "tiiuae/falcon-7b"
-        # - name: dataset_name
-        #   value: "sadmoseby/the-stack-yaml-k8s-annotated"
-        # - name: dataset_training_column
-        #   value: summary
+        - name: model_name
+          value: "tiiuae/falcon-7b"
+        - name: dataset_name
+          value: "heliosbrahma/mental_health_chatbot_dataset"
+        - name: dataset_training_column
+          value: text
         volumeMounts:
           - mountPath: "/mnt/config/peft"
             name: peft-config
