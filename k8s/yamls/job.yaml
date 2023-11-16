@@ -13,15 +13,35 @@ spec:
       - name: peft
         image: rparundekar/fine_tune_research:latest
         command:
-        - python
-        - "./app.py"
+        - bash
+        - "-c"
+        - "python app.py"
         ## OR
         # - bash
         # - "-c"
         # - "sleep 3600"
         env:
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb-api-key
+        - name: WANDB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb-username
+        - name: WANDB_PROJECT
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb-project
         - name: WANDB_MODE
-          value: disabled 
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb-mode
+        
         - name: model_name
           value: "tiiuae/falcon-7b"
         - name: dataset_name
