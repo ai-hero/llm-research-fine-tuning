@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-devel 
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-devel
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -15,20 +15,22 @@ RUN apt-get update \
     && apt-get clean autoremove --yes \
     && rm -rf /var/lib/{apt,dpkg,cache,log}
 
-# Set the working directory in the container to /app
-WORKDIR /app
-
 # Copy the current directory contents into the container at /app
-COPY requirements.txt requirements.txt
+COPY app/requirements.txt requirements.txt
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    rm requirements.txt
 
-COPY . /app
+COPY app /app
+
+# Set the working directory in the container to /app
+WORKDIR /app
+
 
 # Make port 80 available to the world outside this container
 # EXPOSE 80
 
 # Run peft.py when the container launches
-CMD ["python", "./app.py"]
+CMD ["python", "app.py"]
