@@ -1,0 +1,95 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: peft-job
+spec:
+  completions: 1
+  parallelism: 1
+  template:
+    spec:
+      subdomain: peft-svc # has to match Service name
+      restartPolicy: Never
+      containers:
+      - name: peft
+        image: {{ container_image }}
+        command:
+        - bash
+        - "-c"
+        - "python app.py --base_model_type={{ base_model_type }} --base_model_name={{ base_model_name }} --dataset_type={{dataset_type}} --dataset_name={{ dataset_name }} --dataset_training_column={{ dataset_training_column }} --output_model_type={{ output_model_type }} --output_model_name={{ output_model_name }}"
+        ## OR
+        # - bash
+        # - "-c"
+        # - "sleep 3600"
+        env:
+        {% if hf_token %}
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: hf_token
+        {% endif %}
+        {% if wandb_api_key %}
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb_api_key
+        - name: WANDB_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb_username
+        - name: WANDB_PROJECT
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb_project
+        - name: WANDB_MODE
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: wandb_mode
+        {% endif %}
+        {% if s3_endpoint %}
+        - name: S3_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: s3_endpoint
+        - name: S3_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: s3_access_key_id
+        - name: S3_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: s3_secret_access_key
+        - name: S3_REGION
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: s3_region
+        - name: S3_SECURE
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: s3_secure
+        {% endif %}
+
+
+        volumeMounts:
+          - mountPath: "/mnt/config/peft"
+            name: peft-config
+            readOnly: true
+          - mountPath: "/mnt/config/training"
+            name: training-config
+            readOnly: true
+      volumes:
+        - name: peft-config
+          configMap:
+            name: peft
+        - name: training-config
+          configMap:
+            name: training
