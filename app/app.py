@@ -1,7 +1,6 @@
 import os
 import yaml
-
-from train import load_train_config, do_train, fetch_dataset, load_model
+from train import load_train_config, do_train, fetch_dataset, load_model, upload_model
 
 STATIC_CONFIG_PATH="./config.yaml"
 
@@ -24,6 +23,7 @@ def do_run(bootstrap_config):
     model, tokenizer = load_model(bootstrap_config, train_run_config)
     print("Starting training")
     do_train(dataset=dataset, train_column_name=col_name, model=model, tokenizer=tokenizer, train_run_config=train_run_config)
+    upload_model(bootstrap_config)
 
 
 if __name__ == "__main__":

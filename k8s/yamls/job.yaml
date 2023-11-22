@@ -41,13 +41,32 @@ spec:
             secretKeyRef:
               name: secrets
               key: wandb-mode
-        
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: secrets
+              key: hf-token
+
+        {% if model_name %}
         - name: model_name
-          value: "tiiuae/falcon-7b"
+          value: {{ model_name }}
+        {% endif %}
+
+        {% if dataset_name %}
         - name: dataset_name
-          value: "heliosbrahma/mental_health_chatbot_dataset"
+          value: {{ dataset_name }}
+        {% endif %}
+
+        {% if dataset_training_column %}
         - name: dataset_training_column
-          value: text
+          value:  {{ dataset_training_column }}
+        {% endif %}
+
+        {% if checkpoint_model_hf_path %}
+        - name: checkpoint_model_hf_path
+          value: {{ checkpoint_model_hf_path}}
+        {% endif %}
+
         volumeMounts:
           - mountPath: "/mnt/config/peft"
             name: peft-config

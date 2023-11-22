@@ -6,6 +6,7 @@ model_type: "hf" # either hf or disk
 model_name: "tiiuae/falcon-7b"
 model_mount_path: "/mnt/models"
 checkpoint_path: "/mnt/checkpoint"
+checkpoint_model_hf_path: ""
 
 #dataset specific configuration
 dataset_type: "hf" # either hf or csv
@@ -15,7 +16,6 @@ dataset_training_column: "text"
 
 # Training Configuation
 config_suffix: "config"
-
 peft_config_path: "/mnt/config/peft"
 training_config_path: "/mnt/config/training"
 bnb_config_path: "/mnt/config/bnb"

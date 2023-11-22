@@ -5,6 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from datasets import load_dataset
 from peft import LoraConfig
 from trl import SFTTrainer
+from huggingface_hub import HfApi, login
 
 
 def load_model(bootstrap_config, train_run_config):
@@ -106,8 +107,9 @@ def do_train(dataset, train_column_name, model, tokenizer, train_run_config):
 
     trainer.train()
 
-
-
-
-
-
+def upload_model(bootstrap_config):
+    if not bootstrap_config["checkpoint_model_hf_path"]:
+        return
+    api = HfApi()
+    login()
+    api.upload_folder(folder_path=bootstrap_config["checkpoint_path"], repo_id=bootstrap_config["checkpoint_model_hf_path"], repo_type="model")
