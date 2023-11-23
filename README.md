@@ -3,8 +3,8 @@ Code meant to be deployed as a container image on K8s to fine-tune a model
 
 ## Building container
 ```sh
-docker build .  -t rparundekar/fine_tune_research:latest
-docker push rparundekar/fine_tune_research:latest
+docker build .  -t rparundekar/fine_tune_research:202311221140
+docker push rparundekar/fine_tune_research:202311221140
 ```
 
 ## Launching k8s job
