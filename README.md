@@ -17,3 +17,8 @@ OR
 ```sh
 python launch.py --container_image=rparundekar/fine_tune_research:202311221140 --base_model_type=hf --base_model_name="tiiuae/falcon-7b" --dataset_type=hf --dataset_name="heliosbrahma/mental_health_chatbot_dataset" --dataset_training_column="text" --output_model_type=hf --output_model_name="sadmoseby/falcoln-7b-peft-train-intermediate" 
 ```
+
+## Deleting a job
+```sh
+kubectl delete job peft-job   
+```
