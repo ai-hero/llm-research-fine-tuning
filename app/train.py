@@ -7,10 +7,11 @@ from transformers import (
     BitsAndBytesConfig,
     TrainingArguments,
 )
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from peft import LoraConfig
 from trl import SFTTrainer
 from huggingface_hub import HfApi, login
+from utils import DatasetMover
 
 
 def load_model(bootstrap_config, train_run_config):
@@ -39,8 +40,17 @@ def fetch_dataset(bootstrap_config):
     if bootstrap_config["dataset_type"] == "hf":
         dataset = load_dataset(bootstrap_config["dataset_name"], split="train")
     elif bootstrap_config["dataset_type"] == "s3":
-        # TODO : Add s3 support
-        raise NotImplementedError("S3 support not implemented yet")
+        os.makedirs("./data")
+        dataset_mover = DatasetMover()
+
+        dataset_mover.download(
+            bucket_name=bootstrap_config["dataset_name"].split("/")[0],
+            object_name=f"{bootstrap_config['dataset_name'][bootstrap_config['dataset_name'].find('/') + 1 :]}.hf.tar.gz",
+            output_folder_path="./data",
+        )
+        print(os.listdir("./data"))
+        print(os.listdir("./data/mmlu_dataset.hf"))
+        dataset = load_from_disk("./data/mmlu_dataset.hf")["train"]
     else:
         dataset = load_dataset(
             "csv",

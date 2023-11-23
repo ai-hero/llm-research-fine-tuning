@@ -12,6 +12,12 @@ spec:
       containers:
       - name: peft
         image: {{ container_image }}
+        resources:
+          limits:
+            nvidia.com/gpu: 1
+            memory: 32Gi
+            cpu: 8
+        imagePullPolicy: Always    
         command:
         - bash
         - "-c"

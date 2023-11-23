@@ -18,6 +18,7 @@ def b64encode_filter(s):
 
 
 def main(
+    container_image: str,
     base_model_type: str,
     base_model_name: str,
     dataset_type: str,
@@ -34,7 +35,7 @@ def main(
         output_model_type = "hf"
 
     # Get variables
-    container_image = os.getenv("CONTAINER_IMAGE", "").encode("utf-8").decode("utf-8")
+    assert container_image, "You need to provide container_image"
     hf_token = os.getenv("HF_TOKEN", "").encode("utf-8").decode("utf-8")
     s3_endpoint = os.getenv("S3_ENDPOINT", "").encode("utf-8").decode("utf-8")
     s3_access_key_id = os.getenv("S3_ACCESS_KEY_ID", "").encode("utf-8").decode("utf-8")
