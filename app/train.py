@@ -121,7 +121,7 @@ def load_train_config(bootstrap_config):
             per_device_train_batch_size=4,
             gradient_accumulation_steps=4,
             optim="paged_adamw_32bit",
-            save_steps=100,
+            save_strategy="epoch",
             logging_steps=10,
             learning_rate=2e-4,
             fp16=True,
