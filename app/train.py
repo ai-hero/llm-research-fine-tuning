@@ -182,6 +182,6 @@ def upload_model(bootstrap_config):
             repo_id=bootstrap_config["output_model_name"],
             repo_type="model",
         )
-    elif bootstrap_config["base_model_type"] == "s3":
+    elif bootstrap_config["output_model_type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
