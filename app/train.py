@@ -121,12 +121,12 @@ def load_train_config(bootstrap_config):
             per_device_train_batch_size=4,
             gradient_accumulation_steps=4,
             optim="paged_adamw_32bit",
-            save_steps=10,
+            save_steps=100,
             logging_steps=10,
             learning_rate=2e-4,
             fp16=True,
             max_grad_norm=0.3,
-            max_steps=500,
+            num_train_epochs=10,
             warmup_ratio=0.03,
             group_by_length=True,
             lr_scheduler_type="constant",
@@ -174,10 +174,14 @@ def do_train(dataset, train_column_name, model, tokenizer, train_run_config):
 def upload_model(bootstrap_config):
     if not bootstrap_config["output_model_name"]:
         return
-    api = HfApi()
-    login()
-    api.upload_folder(
-        folder_path=bootstrap_config["checkpoint_path"],
-        repo_id=bootstrap_config["output_model_name"],
-        repo_type="model",
-    )
+    if bootstrap_config["output_model_type"] == "hf":
+        api = HfApi()
+        login()
+        api.upload_folder(
+            folder_path=bootstrap_config["checkpoint_path"],
+            repo_id=bootstrap_config["output_model_name"],
+            repo_type="model",
+        )
+    elif bootstrap_config["base_model_type"] == "s3":
+        # TODO : Add s3 support
+        raise NotImplementedError("S3 support not implemented yet")

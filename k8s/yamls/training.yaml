@@ -13,7 +13,7 @@ data:
     learning_rate: 0.0002
     fp16: True
     max_grad_norm: 0.3
-    max_steps: 500
+    num_train_epochs: 10
     warmup_ratio: 0.03
     group_by_length: True
     lr_scheduler_type: "constant"
