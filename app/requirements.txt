@@ -9,3 +9,5 @@ peft==0.6.0
 einops==0.7.0
 wandb==0.15.12
 python-dotenv
+minio
+fire
