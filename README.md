@@ -20,5 +20,5 @@ python launch.py --container_image=rparundekar/fine_tune_research:202311221140 -
 
 ## Deleting a job
 ```sh
-kubectl delete job peft-job   
+kubectl delete job peft-job
 ```
