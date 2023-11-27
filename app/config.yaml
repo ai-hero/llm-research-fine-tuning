@@ -2,10 +2,10 @@
 env: "test"
 
 # Defaults
-base_model_name: "tiiuae/falcon-7b"
-dataset_name: "heliosbrahma/mental_health_chatbot_dataset"
+base_model_name: "mistralai/Mistral-7B-v0.1"
+dataset_name: "gathnex/Gath_baize"
 dataset_training_column: "text"
-output_model_name: "sadmoseby/falcoln-7b-peft-train-intermediate"
+output_model_name: "sadmoseby/Gath_mistral_7b"
 
 # Training Configuation
 config_suffix: "config"

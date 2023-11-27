@@ -11,7 +11,6 @@ def main(
     base_model_name: str = "",
     dataset_type: str = "hf",
     dataset_name: str = "",
-    dataset_training_column: str = "",
     output_model_type: str = "hf",
     output_model_name: str = "",
 ):
@@ -34,11 +33,6 @@ def main(
     bootstrap_config["dataset_name"] = (
         dataset_name if dataset_name else bootstrap_config["dataset_name"]
     )
-    bootstrap_config["dataset_training_column"] = (
-        dataset_training_column
-        if dataset_training_column
-        else bootstrap_config["dataset_training_column"]
-    )
 
     # Output Model
     bootstrap_config["output_model_type"] = (
@@ -55,13 +49,13 @@ def main(
     print("Loading train config")
     train_run_config = load_train_config(bootstrap_config)
     print("Loading dataset")
-    dataset, col_name = fetch_dataset(bootstrap_config)
+    dataset = fetch_dataset(bootstrap_config)
     print("Loading model")
     model, tokenizer = load_model(bootstrap_config, train_run_config)
     print("Starting training")
     do_train(
         dataset=dataset,
-        train_column_name=col_name,
+        train_column_name="text",
         model=model,
         tokenizer=tokenizer,
         train_run_config=train_run_config,

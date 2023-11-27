@@ -23,7 +23,6 @@ def main(
     base_model_name: str,
     dataset_type: str,
     dataset_name: str,
-    dataset_training_column: str,
     output_model_type: str,
     output_model_name: str,
 ):
@@ -109,9 +108,6 @@ def main(
             base_model_name=base_model_name,
             dataset_type=dataset_type,
             dataset_name=dataset_name,
-            dataset_training_column=dataset_training_column.encode("utf-8").decode(
-                "utf-8"
-            ),
             output_model_type=output_model_type,
             output_model_name=output_model_name,
         )

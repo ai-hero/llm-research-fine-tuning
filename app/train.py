@@ -1,17 +1,22 @@
 import yaml
 import os
 import torch
+from wandb import Table
+import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    GenerationConfig,
     BitsAndBytesConfig,
     TrainingArguments,
 )
-from datasets import load_dataset, load_from_disk
+from transformers.integrations import WandbCallback
+from datasets import load_dataset, DatasetDict, load_from_disk
 from peft import LoraConfig
 from trl import SFTTrainer
 from huggingface_hub import HfApi, login
 from utils import DatasetMover
+from datasets import Dataset
 
 
 def load_model(bootstrap_config, train_run_config):
@@ -36,30 +41,46 @@ def load_model(bootstrap_config, train_run_config):
     return model, tokenizer
 
 
-def fetch_dataset(bootstrap_config):
+def training_gnerator(dataset, split="train", from_disk=False):
+    if from_disk:
+        ds = load_from_disk(dataset)
+        ds = ds[split]
+    else:
+        ds = load_dataset(dataset, streaming=True, split=split)
+    for row in iter(ds):
+        text = row["prompt"] + row["completion"]
+        yield {"text": text}
+
+
+def fetch_dataset(bootstrap_config, split="train"):
     if bootstrap_config["dataset_type"] == "hf":
-        dataset = load_dataset(bootstrap_config["dataset_name"], split="train")
+        return Dataset.from_generator(
+            training_gnerator,
+            gen_kwargs={"dataset": bootstrap_config["dataset_name"], "split": split},
+        )
     elif bootstrap_config["dataset_type"] == "s3":
         os.makedirs("./data")
         dataset_mover = DatasetMover()
-
+        local_name = bootstrap_config["dataset_name"][
+            bootstrap_config["dataset_name"].find("/") + 1 :
+        ]
         dataset_mover.download(
             bucket_name=bootstrap_config["dataset_name"].split("/")[0],
-            object_name=f"{bootstrap_config['dataset_name'][bootstrap_config['dataset_name'].find('/') + 1 :]}.hf.tar.gz",
+            object_name=f"{local_name}.tar.gz",
             output_folder_path="./data",
         )
         print(os.listdir("./data"))
-        print(os.listdir("./data/mmlu_dataset.hf"))
-        dataset = load_from_disk("./data/mmlu_dataset.hf")["train"]
-    else:
-        dataset = load_dataset(
-            "csv",
-            data_files=os.path.join(
-                bootstrap_config["dataset_mount_path"], bootstrap_config["dataset_name"]
-            ),
-            split="train",
+        print(os.listdir(f"./data/{local_name}"))
+        return Dataset.from_generator(
+            training_gnerator,
+            gen_kwargs={
+                "dataset": f"./data/{local_name}",
+                "split": split,
+                "from_disk": True,
+            },
         )
-    return dataset, bootstrap_config["dataset_training_column"]
+    else:
+        raise ValueError(f"Unknown dataset_type: {bootstrap_config['dataset_type']}")
 
 
 def load_train_config(bootstrap_config):
@@ -139,11 +160,57 @@ def load_train_config(bootstrap_config):
     }
 
 
+class LLMSampleCB(WandbCallback):
+    def __init__(
+        self,
+        trainer,
+        test_dataset,
+        num_samples=10,
+        max_new_tokens=256,
+        log_model="checkpoint",
+    ):
+        super().__init__()
+        self._log_model = log_model
+        self.sample_dataset = test_dataset.select(range(num_samples))
+        self.model, self.tokenizer = trainer.model, trainer.tokenizer
+        self.gen_config = GenerationConfig.from_pretrained(
+            trainer.model.name_or_path, max_new_tokens=max_new_tokens
+        )
+
+    def generate(self, prompt):
+        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt")[
+            "input_ids"
+        ].cuda()
+        with torch.inference_mode():
+            output = self.model.generate(
+                tokenized_prompt, generation_config=self.gen_config
+            )
+        return self.tokenizer.decode(
+            output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True
+        )
+
+    def samples_table(self, examples):
+        records_table = Table(
+            columns=["prompt", "generation"] + list(self.gen_config.to_dict().keys())
+        )
+        for example in tqdm(examples, leave=False):
+            prompt = example["text"]
+            generation = self.generate(prompt=prompt)
+            records_table.add_data(
+                prompt, generation, *list(self.gen_config.to_dict().values())
+            )
+        return records_table
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        super().on_evaluate(args, state, control, **kwargs)
+        records_table = self.samples_table(self.sample_dataset)
+        self._wandb.log({"sample_predictions": records_table})
+
+
 def do_train(dataset, train_column_name, model, tokenizer, train_run_config):
     # Note that default configurations are intended for falcoln 7B model
     dataset = dataset.shuffle()
 
-    # os.environ["WANDB_DISABLED"] = "true"
     # Assumes model is a causal language model
     model.config.use_cache = False
 
