@@ -1,0 +1,19 @@
+# env configuration
+env: "test"
+
+# Defaults
+base_model_name: "mistralai/Mistral-7B-v0.1"
+dataset_name: "gathnex/Gath_baize"
+dataset_training_column: "text"
+output_model_name: "sadmoseby/Gath_mistral_7b"
+
+# Training Configuation
+config_suffix: "config"
+peft_config_path: "/mnt/config/peft"
+training_config_path: "/mnt/config/training"
+bnb_config_path: "/mnt/config/bnb"
+
+# Directories For Pretrained Model, Checkpoint, and Dataset
+model_mount_path: "/mnt/models"
+checkpoint_path: "/mnt/checkpoint"
+dataset_mount_path: "/mnt/datasets"

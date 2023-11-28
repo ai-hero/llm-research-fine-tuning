@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: peft-job
+  name: training-job
 spec:
   completions: 1
   parallelism: 1
@@ -21,7 +21,11 @@ spec:
         command:
         - bash
         - "-c"
-        - "python app.py --base_model_type={{ base_model_type }} --base_model_name={{ base_model_name }} --dataset_type={{dataset_type}} --dataset_name={{ dataset_name }} --dataset_training_column={{ dataset_training_column }} --output_model_type={{ output_model_type }} --output_model_name={{ output_model_name }}"
+        {% if config_file %}
+        - "python sft.py --config_file=/mnt/config/training/config"
+        {% else %}
+        - "python sft.py"
+        {% endif %}
         ## OR
         # - bash
         # - "-c"
@@ -84,18 +88,13 @@ spec:
               key: s3_secure
         {% endif %}
 
-
+    {% if config_file %}
         volumeMounts:
-          - mountPath: "/mnt/config/peft"
-            name: peft-config
-            readOnly: true
           - mountPath: "/mnt/config/training"
             name: training-config
             readOnly: true
       volumes:
-        - name: peft-config
-          configMap:
-            name: peft
         - name: training-config
           configMap:
             name: training
+    {% endif %}
