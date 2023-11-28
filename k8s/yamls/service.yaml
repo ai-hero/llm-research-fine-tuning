@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: peft-svc
+  name: training-svc
 spec:
   clusterIP: None # clusterIP must be None to create a headless service
   selector:
-    job-name: peft-training # must match Job name
+    job-name: training-job # must match Job name
