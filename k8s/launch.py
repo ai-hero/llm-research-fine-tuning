@@ -5,6 +5,7 @@ import base64
 import subprocess
 from jinja2 import Environment, FileSystemLoader
 from dotenv import load_dotenv
+import yaml
 
 # Load environment variables
 load_dotenv()
@@ -17,7 +18,7 @@ def b64encode_filter(s):
     return None
 
 
-def main(container_image: str):
+def main(container_image: str, config_file: str = "guanaco_peft.yaml"):
     # Get variables
     assert container_image, "You need to provide container_image"
     hf_token = os.getenv("HF_TOKEN", "")
@@ -35,7 +36,6 @@ def main(container_image: str):
     assert wandb_username, "You need to set WANDB_USERNAME env var"
     assert wandb_project, "You need to set WANDB_PROJECT env var"
 
-    config_file = ""
     # Setup Jinja2 environment
     env = Environment(loader=FileSystemLoader("."))
     env.filters["b64encode"] = b64encode_filter
@@ -45,25 +45,35 @@ def main(container_image: str):
 
     # Iterate through all yaml files in the 'yamls' directory
     for yaml_file in glob.glob(os.path.join(yaml_dir, "*.yaml")):
-        # Load the template
-        template = env.get_template(os.path.relpath(yaml_file))
         if "config.yaml" == yaml_file.split("/")[-1]:
-            print("Found config.yaml")
-            config_file = yaml_file
-        # Render the template with environment variables
-        rendered_template = template.render(
-            container_image=container_image,
-            s3_endpoint=s3_endpoint,
-            s3_access_key_id=s3_access_key_id,
-            s3_secret_access_key=s3_secret_access_key,
-            s3_region=s3_region,
-            s3_secure=f"{s3_secure}",
-            hf_token=hf_token,
-            wandb_api_key=wandb_api_key,
-            wandb_username=wandb_username,
-            wandb_project=wandb_project,
-            config_file=config_file,
-        )
+            with open(
+                os.path.relpath(yaml_file),
+                "r",
+            ) as f:
+                config = yaml.safe_load(f)
+            with open(
+                os.path.join(os.path.dirname(__file__), "configs", config_file), "r"
+            ) as f:
+                training_config = yaml.safe_load(f)
+            config["data"]["config.yaml"] = yaml.dump(training_config)
+            rendered_template = yaml.dump(config)
+        else:
+            # Load the template
+            template = env.get_template(os.path.relpath(yaml_file))
+            # Render the template with environment variables
+            rendered_template = template.render(
+                container_image=container_image,
+                s3_endpoint=s3_endpoint,
+                s3_access_key_id=s3_access_key_id,
+                s3_secret_access_key=s3_secret_access_key,
+                s3_region=s3_region,
+                s3_secure=f"{s3_secure}",
+                hf_token=hf_token,
+                wandb_api_key=wandb_api_key,
+                wandb_username=wandb_username,
+                wandb_project=wandb_project,
+                config_file=config_file,
+            )
 
         # Use subprocess.Popen with communicate to apply the Kubernetes configuration
         with subprocess.Popen(
