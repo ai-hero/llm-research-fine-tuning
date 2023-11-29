@@ -178,6 +178,7 @@ def train(train_dataset, val_dataset, model, tokenizer, config):
         n_freeze = config["training"]["other"].get("n_freeze", 24)
         freeze_embed = config["training"]["other"].get("freeze_embed", True)
         freeze(model, n_freeze, freeze_embed)
+        peft_config = None
 
     trainer = SFTTrainer(
         tokenizer=tokenizer,
