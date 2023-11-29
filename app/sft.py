@@ -14,12 +14,12 @@ from transformers import (
     GenerationConfig,
     TrainingArguments,
 )
-from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from utils import DatasetMover
+from transformers.integrations import WandbCallback
 from wandb import Table
 
-DEFAULT_STATIC_CONFIG_PATH = "./config.yaml"
+DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
 MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
@@ -43,21 +43,26 @@ def fetch_dataset(config):
     if config["dataset"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
-        return Dataset.from_generator(
+        train_dataset = Dataset.from_generator(
             training_generator,
             gen_kwargs={
                 "dataset": config["dataset"]["name"],
                 "split": "train",
                 "format": config["dataset"].get("format", "text"),
             },
-        ), Dataset.from_generator(
-            training_generator,
-            gen_kwargs={
-                "dataset": config["dataset"]["name"],
-                "split": "val",
-                "format": config["dataset"].get("format", "text"),
-            },
         )
+        try:
+            val_dataset = Dataset.from_generator(
+                training_generator,
+                gen_kwargs={
+                    "dataset": config["dataset"]["name"],
+                    "split": "val",
+                    "format": config["dataset"].get("format", "text"),
+                },
+            )
+        except:
+            print("Unable to create val dataset")
+            val_dataset = None
     elif config["dataset"]["type"] == "s3":
         os.makedirs(DATASET_DIR)
         dataset_mover = DatasetMover()
@@ -71,7 +76,7 @@ def fetch_dataset(config):
         )
         print(os.listdir(DATASET_DIR))
         print(os.listdir(f"{DATASET_DIR}/{local_name}"))
-        return Dataset.from_generator(
+        train_dataset = Dataset.from_generator(
             training_generator,
             gen_kwargs={
                 "dataset": f"{DATASET_DIR}/{local_name}",
@@ -79,17 +84,23 @@ def fetch_dataset(config):
                 "from_disk": True,
                 "format": config["dataset"].get("format", "text"),
             },
-        ), Dataset.from_generator(
-            training_generator,
-            gen_kwargs={
-                "dataset": f"{DATASET_DIR}/{local_name}",
-                "split": "val",
-                "from_disk": True,
-                "format": config["dataset"].get("format", "text"),
-            },
         )
+        try:
+            val_dataset = Dataset.from_generator(
+                training_generator,
+                gen_kwargs={
+                    "dataset": f"{DATASET_DIR}/{local_name}",
+                    "split": "val",
+                    "from_disk": True,
+                    "format": config["dataset"].get("format", "text"),
+                },
+            )
+        except:
+            print("Unable to create val dataset")
+            val_dataset = None
     else:
         raise ValueError(f"Unknown dataset_type: {config['dataset']['type']}")
+    return train_dataset, val_dataset
 
 
 def load_model(config):
@@ -164,7 +175,10 @@ def train(train_dataset, val_dataset, model, tokenizer, config):
         sft_config.peft_config = peft_config
         sft_config.n_freeze = "all"
     else:
-        freeze(model, sft_config.n_freeze, sft_config.freeze_embed)
+        n_freeze = config["training"]["other"].get("n_freeze", 24)
+        freeze_embed = config["training"]["other"].get("freeze_embed", True)
+        freeze(model, n_freeze, freeze_embed)
+        peft_config = None
 
     trainer = SFTTrainer(
         tokenizer=tokenizer,
