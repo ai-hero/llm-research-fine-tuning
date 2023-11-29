@@ -29,9 +29,6 @@ training:
     gradient_checkpointing_kwargs:
       use_reentrant: False
     logging_steps: 10
-  other:
-    freeze_embed: True
-    n_freeze: 24
   peft:
     r: 64  # the rank of the LoRA matrices
     lora_alpha: 16 # the weight
