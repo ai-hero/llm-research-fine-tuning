@@ -2,6 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{job_name}}
+  project: {{project_name}}
 spec:
   completions: 1
   parallelism: 1
