@@ -72,7 +72,6 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
             hf_token=hf_token,
             wandb_api_key=wandb_api_key,
             wandb_username=wandb_username,
-            wandb_project=wandb_project,
             wandb_job_name=job_name,
             wandb_tags=wandb_tags,
             config_file=config_file,
