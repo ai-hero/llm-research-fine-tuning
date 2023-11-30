@@ -1,8 +1,8 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: training-svc
+  name: {{job_name}}
 spec:
   clusterIP: None # clusterIP must be None to create a headless service
   selector:
-    job-name: training-job # must match Job name
+    job-name: {{job_name}} # must match Job name

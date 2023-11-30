@@ -6,6 +6,8 @@ import subprocess
 from jinja2 import Environment, FileSystemLoader
 from dotenv import load_dotenv
 import yaml
+import time
+from codenamize import codenamize
 
 # Load environment variables
 load_dotenv()
@@ -18,7 +20,10 @@ def b64encode_filter(s):
     return None
 
 
-def main(container_image: str, config_file: str = "guanaco_peft.yaml"):
+def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
+    job_name = codenamize(f"{config_file}-{time.time()}")
+    print(f"Job name: {job_name}")
+
     # Get variables
     assert container_image, "You need to provide container_image"
     hf_token = os.getenv("HF_TOKEN", "")
@@ -45,35 +50,40 @@ def main(container_image: str, config_file: str = "guanaco_peft.yaml"):
 
     # Iterate through all yaml files in the 'yamls' directory
     for yaml_file in glob.glob(os.path.join(yaml_dir, "*.yaml")):
+        # Load training config file and extract dataset name
+        with open(
+            os.path.join(os.path.dirname(__file__), "configs", config_file), "r"
+        ) as f:
+            training_config = yaml.safe_load(f)
+        dataset_name = training_config["dataset"]["name"]
+        wandb_tags = (
+            f"{os.getenv('USER',os.getenv('USERNAME'))},{job_name},{dataset_name}"
+        )
+
+        # Load the template
+        template = env.get_template(os.path.relpath(yaml_file))
+        # Render the template with environment variables
+        rendered_template = template.render(
+            job_name=job_name,
+            container_image=container_image,
+            s3_endpoint=s3_endpoint,
+            s3_access_key_id=s3_access_key_id,
+            s3_secret_access_key=s3_secret_access_key,
+            s3_region=s3_region,
+            s3_secure=f"{s3_secure}",
+            hf_token=hf_token,
+            wandb_api_key=wandb_api_key,
+            wandb_username=wandb_username,
+            wandb_project=wandb_project,
+            wandb_job_name=job_name,
+            wandb_tags=wandb_tags,
+            config_file=config_file,
+        )
         if "config.yaml" == yaml_file.split("/")[-1]:
-            with open(
-                os.path.relpath(yaml_file),
-                "r",
-            ) as f:
-                config = yaml.safe_load(f)
-            with open(
-                os.path.join(os.path.dirname(__file__), "configs", config_file), "r"
-            ) as f:
-                training_config = yaml.safe_load(f)
+            # Set the training config as the string value for config map
+            config = yaml.safe_load(rendered_template)
             config["data"]["config.yaml"] = yaml.dump(training_config)
             rendered_template = yaml.dump(config)
-        else:
-            # Load the template
-            template = env.get_template(os.path.relpath(yaml_file))
-            # Render the template with environment variables
-            rendered_template = template.render(
-                container_image=container_image,
-                s3_endpoint=s3_endpoint,
-                s3_access_key_id=s3_access_key_id,
-                s3_secret_access_key=s3_secret_access_key,
-                s3_region=s3_region,
-                s3_secure=f"{s3_secure}",
-                hf_token=hf_token,
-                wandb_api_key=wandb_api_key,
-                wandb_username=wandb_username,
-                wandb_project=wandb_project,
-                config_file=config_file,
-            )
 
         # Use subprocess.Popen with communicate to apply the Kubernetes configuration
         with subprocess.Popen(
@@ -81,8 +91,44 @@ def main(container_image: str, config_file: str = "guanaco_peft.yaml"):
         ) as proc:
             proc.communicate(rendered_template)
 
-        print(f"Applied Kubernetes configuration from {yaml_file}")
+    print(f"Applied Kubernetes configuration from {yaml_file}")
+
+    print(f"Launched job name: {job_name}")
+    print(f"1. To see status, run: kubectl describe job/{job_name}")
+    print(f"2. To see logs, run: kubectl logs job/{job_name} -f")
+    print(
+        f"3. To delete job, run: python launch.py delete {job_name} (to delete all artifacts)"
+    )
+
+
+def delete(job_name: str):
+    assert job_name, "You need to provide job_name"
+    # Use subprocess.Popen with communicate to delete the Kubernetes job
+    with subprocess.Popen(
+        ["kubectl", "delete", "job", job_name], stdin=subprocess.PIPE, text=True
+    ) as proc:
+        proc.communicate()
+    print(f"Deleted Kubernetes job {job_name}")
+
+    # Use subprocess.Popen with communicate to delete the Kubernetes job
+    with subprocess.Popen(
+        ["kubectl", "delete", "service", job_name], stdin=subprocess.PIPE, text=True
+    ) as proc:
+        proc.communicate()
+    print(f"Deleted Kubernetes service {job_name}")
+
+    # Use subprocess.Popen with communicate to delete the Kubernetes job
+    with subprocess.Popen(
+        ["kubectl", "delete", "configmap", job_name], stdin=subprocess.PIPE, text=True
+    ) as proc:
+        proc.communicate()
+    print(f"Deleted Kubernetes configmap {job_name}")
 
 
 if __name__ == "__main__":
-    Fire(main)
+    Fire(
+        {
+            "train": train,
+            "delete": delete,
+        }
+    )
