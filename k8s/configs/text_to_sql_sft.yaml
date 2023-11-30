@@ -29,14 +29,6 @@ training:
     gradient_checkpointing_kwargs:
       use_reentrant: False
     logging_steps: 10
-  peft:
-    r: 64  # the rank of the LoRA matrices
-    lora_alpha: 16 # the weight
-    lora_dropout: 0.1 # dropout to add to the LoRA layers
-    bias: "none" # add bias to the nn.Linear layers?
-    task_type: "CAUSAL_LM"
-    target_modules:  # the name of the layers to add LoRA
-      - "q_proj" 
-      - "k_proj"
-      - "v_proj" 
-      - "o_proj"
+  other:
+    freeze_embed: True
+    n_freeze: 24
