@@ -12,10 +12,11 @@ Update [k8s/yamls/config.yaml](k8s/yamls/config.yaml).
 ## Launching k8s job
 ```sh
 cd k8s/
-python launch.py rparundekar/fine_tune_research:20231129_04 llmos_peft.yaml 
+python launch.py train rparundekar/fine_tune_research:20231129_04 guanaco_peft.yaml
 ```
+You'll see the name of the job. 
 
 ## Deleting a job
 ```sh
-kubectl delete job training-job
+python launch.py delete <job-name>
 ```

@@ -1,16 +1,18 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: training-job
+  name: {{job_name}}
+  labels:
+    project: {{project_name}}
 spec:
   completions: 1
   parallelism: 1
   template:
     spec:
-      subdomain: peft-svc # has to match Service name
+      subdomain: {{job_name}} # has to match Service name
       restartPolicy: Never
       containers:
-      - name: peft
+      - name: sft
         image: {{ container_image }}
         resources:
           limits:
@@ -50,10 +52,11 @@ spec:
               name: secrets
               key: wandb_username
         - name: WANDB_PROJECT
-          valueFrom:
-            secretKeyRef:
-              name: secrets
-              key: wandb_project
+          value: {{project_name}}
+        - name: WANDB_NAME
+          value: {{job_name}}
+        - name: WANDB_TAGS
+          value: {{wandb_tags}}
         - name: WANDB_MODE
           valueFrom:
             secretKeyRef:
@@ -96,5 +99,5 @@ spec:
       volumes:
         - name: training-config
           configMap:
-            name: training
+            name: {{job_name}}
     {% endif %}
