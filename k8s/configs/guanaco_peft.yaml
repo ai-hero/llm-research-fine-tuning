@@ -1,4 +1,7 @@
-sdataset:  
+project:
+  name: "fine_tune_research"
+  
+dataset:  
   type: "hf"
   name: "mlabonne/guanaco-llama2-1k"
   format: "text"
