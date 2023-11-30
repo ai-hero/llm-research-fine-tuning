@@ -1,4 +1,6 @@
-
+project:
+  name: "fine_tune_research"
+  
 dataset:  
   type: "s3"
   name: "fine-tuning-research/mmlu_dataset"

@@ -1,4 +1,4 @@
-dataset:  
+sdataset:  
   type: "hf"
   name: "mlabonne/guanaco-llama2-1k"
   format: "text"

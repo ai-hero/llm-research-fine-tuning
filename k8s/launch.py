@@ -34,12 +34,10 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
     s3_secure = os.getenv("S3_SECURE", "")
     wandb_api_key = os.getenv("WANDB_API_KEY", "")
     wandb_username = os.getenv("WANDB_USERNAME", "")
-    wandb_project = os.getenv("WANDB_PROJECT", "")
 
     assert container_image, "You need to set CONTAINER_IMAGE env var"
     assert wandb_api_key, "You need to set WANDB_API_KEY env var"
     assert wandb_username, "You need to set WANDB_USERNAME env var"
-    assert wandb_project, "You need to set WANDB_PROJECT env var"
 
     # Setup Jinja2 environment
     env = Environment(loader=FileSystemLoader("."))
@@ -48,22 +46,22 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
     # Directory containing the YAML files
     yaml_dir = os.path.join(os.path.dirname(__file__), "yamls")
 
+    # Load training config file and extract dataset name
+    with open(
+        os.path.join(os.path.dirname(__file__), "configs", config_file), "r"
+    ) as f:
+        training_config = yaml.safe_load(f)
+    dataset_name = training_config["dataset"]["name"]
+    project_name = training_config["project"]["name"]
+    wandb_tags = f"{os.getenv('USER',os.getenv('USERNAME'))},{job_name},{dataset_name}"
+
     # Iterate through all yaml files in the 'yamls' directory
     for yaml_file in glob.glob(os.path.join(yaml_dir, "*.yaml")):
-        # Load training config file and extract dataset name
-        with open(
-            os.path.join(os.path.dirname(__file__), "configs", config_file), "r"
-        ) as f:
-            training_config = yaml.safe_load(f)
-        dataset_name = training_config["dataset"]["name"]
-        wandb_tags = (
-            f"{os.getenv('USER',os.getenv('USERNAME'))},{job_name},{dataset_name}"
-        )
-
         # Load the template
         template = env.get_template(os.path.relpath(yaml_file))
         # Render the template with environment variables
         rendered_template = template.render(
+            project_name=project_name,
             job_name=job_name,
             container_image=container_image,
             s3_endpoint=s3_endpoint,

@@ -50,10 +50,7 @@ spec:
               name: secrets
               key: wandb_username
         - name: WANDB_PROJECT
-          valueFrom:
-            secretKeyRef:
-              name: secrets
-              key: wandb_project
+          value: {{project_name}}
         - name: WANDB_NAME
           value: {{job_name}}
         - name: WANDB_TAGS
