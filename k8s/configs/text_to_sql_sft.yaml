@@ -31,7 +31,10 @@ training:
     gradient_checkpointing: True
     gradient_checkpointing_kwargs:
       use_reentrant: False
-    logging_steps: 10
+    logging_strategy: "steps"
+    logging_steps: 5
+    evaluation_strategy: "steps"
+    eval_steps: 10
   other:
     freeze_embed: True
     n_freeze: 24
