@@ -94,7 +94,7 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
     print(f"1. To see status, run: kubectl describe job/{job_name}")
     print(f"2. To see logs, run: kubectl logs job/{job_name} -f")
     print(
-        f"3. To delete job, run: python launch.py delete {job_name} (to delete all artifacts)"
+        f"3. To delete job and other artifacts, run: python launch.py delete {job_name}"
     )
 
 

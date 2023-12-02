@@ -31,7 +31,8 @@ training:
     gradient_checkpointing: True
     gradient_checkpointing_kwargs:
       use_reentrant: False
-    logging_steps: 10
+    logging_strategy: "steps"
+    logging_steps: 5
   peft:
     r: 64  # the rank of the LoRA matrices
     lora_alpha: 16 # the weight

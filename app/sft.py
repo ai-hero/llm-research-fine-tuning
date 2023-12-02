@@ -63,6 +63,18 @@ def fetch_dataset(config):
         except:
             print("Unable to create val dataset")
             val_dataset = None
+        try:
+            test_dataset = Dataset.from_generator(
+                training_generator,
+                gen_kwargs={
+                    "dataset": config["dataset"]["name"],
+                    "split": "test",
+                    "format": config["dataset"].get("format", "text"),
+                },
+            )
+        except:
+            print("Unable to create test dataset")
+            test_dataset = None
     elif config["dataset"]["type"] == "s3":
         os.makedirs(DATASET_DIR)
         dataset_mover = DatasetMover()
@@ -98,9 +110,22 @@ def fetch_dataset(config):
         except:
             print("Unable to create val dataset")
             val_dataset = None
+        try:
+            test_dataset = Dataset.from_generator(
+                training_generator,
+                gen_kwargs={
+                    "dataset": f"{DATASET_DIR}/{local_name}",
+                    "split": "test",
+                    "from_disk": True,
+                    "format": config["dataset"].get("format", "text"),
+                },
+            )
+        except:
+            print("Unable to create test dataset")
+            test_dataset = None
     else:
         raise ValueError(f"Unknown dataset_type: {config['dataset']['type']}")
-    return train_dataset, val_dataset
+    return train_dataset, val_dataset, test_dataset
 
 
 def load_model(config):
@@ -151,9 +176,9 @@ def freeze(model, n_freeze, freeze_embed, module_name="layers"):
         embed_tokens.weight.requires_grad_(False)
 
 
-def train(train_dataset, val_dataset, model, tokenizer, config):
+def train(train_split, val_split, test_split, model, tokenizer, config):
     # Note that default configurations are intended for falcoln 7B model
-    train_dataset = train_dataset.shuffle()
+    train_split = train_split.shuffle()
 
     # Assumes model is a causal language model
     model.config.use_cache = False
@@ -183,8 +208,8 @@ def train(train_dataset, val_dataset, model, tokenizer, config):
     trainer = SFTTrainer(
         tokenizer=tokenizer,
         model=model,
-        train_dataset=train_dataset,
-        eval_dataset=val_dataset,
+        train_dataset=train_split,
+        eval_dataset=val_split,
         peft_config=peft_config,
         dataset_text_field="text",
         max_seq_length=config["training"]["trainer"]["max_seq_length"],
@@ -193,6 +218,9 @@ def train(train_dataset, val_dataset, model, tokenizer, config):
     )
 
     trainer.train()
+
+    if test_split:
+        trainer.evaluate(test_split)
 
 
 def upload_model(config):
@@ -223,13 +251,14 @@ def main():
         config = yaml.safe_load(f)
 
     print("Loading dataset")
-    train_dataset, val_dataset = fetch_dataset(config)
+    train_split, val_split, test_split = fetch_dataset(config)
     print("Loading model")
     model, tokenizer = load_model(config)
     print("Starting training")
     train(
-        train_dataset=train_dataset,
-        val_dataset=val_dataset,
+        train_split=train_split,
+        val_split=val_split,
+        test_split=test_split,
         model=model,
         tokenizer=tokenizer,
         config=config,
