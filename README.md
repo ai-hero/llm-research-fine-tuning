@@ -3,8 +3,8 @@ Code meant to be deployed as a container image on K8s to fine-tune a model
 
 ## Building container
 ```sh
-docker build . -t rparundekar/fine_tune_research:20231129_05 \
-    && docker push rparundekar/fine_tune_research:20231129_05
+docker build . -t rparundekar/fine_tune_research:20231129_06 \
+    && docker push rparundekar/fine_tune_research:20231129_06
 ```
 ## Config for the k8s job
 Update [k8s/yamls/config.yaml](k8s/yamls/config.yaml).
@@ -12,7 +12,7 @@ Update [k8s/yamls/config.yaml](k8s/yamls/config.yaml).
 ## Launching k8s job
 ```sh
 cd k8s/
-python launch.py train rparundekar/fine_tune_research:20231129_05 guanaco_peft.yaml
+python launch.py train rparundekar/fine_tune_research:20231129_06 alpaca_peft.yaml
 ```
 You'll see the name of the job. 
 
