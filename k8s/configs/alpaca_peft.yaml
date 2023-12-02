@@ -34,7 +34,7 @@ training:
     logging_strategy: "steps"
     logging_steps: 5
     evaluation_strategy: "steps"
-    eval_steps: 10
+    eval_steps: 100
   peft:
     r: 64  # the rank of the LoRA matrices
     lora_alpha: 16 # the weight
