@@ -31,6 +31,7 @@ def training_generator(dataset, split="train", from_disk=False, format="text"):
         ds = ds[split]
     else:
         ds = load_dataset(dataset, streaming=True, split=split)
+    print(f"{ds.num_rows} rows in {split} split")
     for row in iter(ds):
         if format == "text":
             text = row["text"]
@@ -177,9 +178,6 @@ def freeze(model, n_freeze, freeze_embed, module_name="layers"):
 
 
 def train(train_split, val_split, test_split, model, tokenizer, config):
-    # Note that default configurations are intended for falcoln 7B model
-    train_split = train_split.shuffle()
-
     # Assumes model is a causal language model
     model.config.use_cache = False
 
@@ -187,6 +185,19 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
     tokenizer.add_special_tokens({"pad_token": "[PAD]"})
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
+
+    # Calculate max steps from num epochs
+    if "num_train_epochs" in config["training"]["sft"]:
+        num_train_epochs = config["training"]["sft"].pop("num_train_epochs")
+        max_steps = (
+            num_train_epochs
+            * train_split.num_rows
+            // config["training"]["sft"]["per_device_train_batch_size"]
+        )  # TODO: Add num gpus when we do FSDP
+        config["training"]["sft"]["max_steps"] = max_steps
+        save_steps = max_steps // 8
+        config["training"]["sft"]["save_steps"] = save_steps
+        config["training"]["sft"]["save_strategy"] = "steps"
 
     # SFT training config
     sft_config = TrainingArguments(
@@ -219,8 +230,8 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
 
     trainer.train()
 
-    if test_split:
-        trainer.evaluate(test_split)
+    # if test_split:
+    #     trainer.evaluate(test_split)
 
 
 def upload_model(config):
