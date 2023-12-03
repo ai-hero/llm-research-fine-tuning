@@ -17,22 +17,22 @@ spec:
         image: {{ container_image }}
         resources:
           limits:
-            nvidia.com/gpu: 1
             memory: 32Gi
             cpu: 8
-        imagePullPolicy: Always
+            {% if num_gpu %}
+            nvidia.com/gpu: {{ num_gpu }}
+            {% else %}
+            nvidia.com/gpu: 1
+            {% endif %}
+        imagePullPolicy: Always    
         command:
         - bash
         - "-c"
-        {% if config_file %}
-        - "python sft.py --config_file=/mnt/config/training/config"
+        {% if num_gpu %}
+        - "accelerate launch --config_file /mnt/config/training/distributed.yaml sft.py"
         {% else %}
         - "python sft.py"
         {% endif %}
-        ## OR
-        # - bash
-        # - "-c"
-        # - "sleep 3600"
         env:
         {% if hf_token %}
         - name: HF_TOKEN

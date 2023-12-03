@@ -14,11 +14,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
+from utils import DatasetMover, load_config, peft_module_casting_to_bf16, dump_envs
 
-from utils import DatasetMover
-
-DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
-MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
 MAX_NEW_TOKENS = 512
@@ -33,11 +30,11 @@ def training_generator(
     if from_disk:
         ds = load_from_disk(dataset)
         ds = ds[split]
+        # Iterate through the dataset and yield each row
+        print(f"{ds.num_rows} rows in {split} split")
     else:
         ds = load_dataset(dataset, streaming=True, split=split)
 
-    # Iterate through the dataset and yield each row
-    print(f"{ds.num_rows} rows in {split} split")
     for row in iter(ds):
         if format == "text":
             text = row["text"]
@@ -300,7 +297,7 @@ def train(
         num_train_epochs = config["training"]["sft"].pop("num_train_epochs")
         max_steps = (
             num_train_epochs * train_split.num_rows // config["training"]["sft"]["per_device_train_batch_size"]
-        )  # TODO: Add num gpus when we do FSDP
+        )  # TODO: Add num gpus when we do FSDP. need to fix this
         config["training"]["sft"]["max_steps"] = max_steps
         save_steps = max_steps // 8
         config["training"]["sft"]["save_steps"] = save_steps
@@ -308,10 +305,13 @@ def train(
 
     # SFT training config
     sft_config = TrainingArguments(output_dir=CHECKPOINT_DIR, **config["training"]["sft"])
+    
     # PEFT training config
     if "peft" in config["training"]:
         peft_config = LoraConfig(**config["training"]["peft"])
         model = get_peft_model(model, peft_config)
+        if "bf16" in config["training"]["sft"]:
+            peft_module_casting_to_bf16(model, config["training"]["sft"])
         model.print_trainable_parameters()
         sft_config.peft_config = peft_config
         sft_config.n_freeze = "all"
@@ -347,12 +347,18 @@ def train(
 
     trainer.train()
 
+    # distributed training config 
+    if trainer.is_fsdp_enabled:
+        trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
+
     # if test_split and test_split.num_rows > 0:
     #     trainer.evaluate(test_split)
 
 
 def upload_model(config: dict[str, Any]) -> None:
     """Upload the model to HuggingFace Hub or S3."""
+    if os.getenv("RANK", "0") != "0":
+        return
     if "output" not in config["model"]:
         return
     if config["model"]["output"]["type"] == "hf":
@@ -363,23 +369,16 @@ def upload_model(config: dict[str, Any]) -> None:
             folder_path=CHECKPOINT_DIR,
             repo_id=config["model"]["output"]["name"],
             repo_type="model",
+            token=os.environ["HF_TOKEN"],
         )
     elif config["model"]["output"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
 
 
-def main() -> None:
-    """Run the train by downloading dataset, run train, and upload model."""
-    if os.path.exists(MOUNTED_CONFIG_PATH):
-        config_file = MOUNTED_CONFIG_PATH
-        print("Loading mounted config")
-    else:
-        config_file = DEFAULT_STATIC_CONFIG_PATH
-        print("Loading default config")
-    with open(file=config_file, encoding="utf-8") as f:
-        config = yaml.safe_load(f)
-
+def main():
+    dump_envs()
+    config = load_config()
     print("Loading dataset")
     train_split, val_split, test_split = fetch_dataset(config)
     print("Loading model")
