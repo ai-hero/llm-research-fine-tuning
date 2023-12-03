@@ -224,7 +224,9 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
         peft_config=peft_config,
         dataset_text_field="text",
         max_seq_length=config["training"]["trainer"]["max_seq_length"],
-        packing=config["training"]["trainer"]["packing"],
+        packing=config["training"]["trainer"][
+            "packing"
+        ],  # Should you combine multiple examples into one sequence?
         args=sft_config,
     )
 
