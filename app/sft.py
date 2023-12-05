@@ -25,6 +25,7 @@ DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
 MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
+MAX_NEW_TOKENS = 512
 
 
 def training_generator(dataset, split="train", from_disk=False, format="text"):
@@ -193,7 +194,7 @@ class LLMSampleCB(WandbCallback):
         format,
         test_split,
         num_samples=100,
-        max_new_tokens=256,
+        max_new_tokens=MAX_NEW_TOKENS,
         log_model="checkpoint",
     ):
         super().__init__()
@@ -216,7 +217,7 @@ class LLMSampleCB(WandbCallback):
         ].cuda()
         with torch.inference_mode():
             output = self.model.generate(
-                tokenized_prompt, generation_config=self.gen_config
+                inputs=tokenized_prompt, generation_config=self.gen_config
             )
         return self.tokenizer.decode(
             output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True
@@ -299,7 +300,7 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
     if test_split and test_split.num_rows > 0 and format == "completion":
         # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
         wandb_callback = LLMSampleCB(
-            trainer, format, test_split, num_samples=15, max_new_tokens=512
+            trainer, format, test_split, num_samples=15, max_new_tokens=MAX_NEW_TOKENS
         )
         trainer.add_callback(wandb_callback)
 
