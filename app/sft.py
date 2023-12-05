@@ -1,7 +1,7 @@
 import os
 
 import torch
-import tqdm
+from tqdm import tqdm
 import yaml
 from datasets import Dataset, load_dataset, load_from_disk
 from fire import Fire
@@ -14,10 +14,12 @@ from transformers import (
     GenerationConfig,
     TrainingArguments,
 )
+from wandb import Table
 from trl import SFTTrainer
 from utils import DatasetMover
 from transformers.integrations import WandbCallback
-from wandb import Table
+from wandb import Table, finish
+from random import random
 
 DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
 MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
@@ -35,16 +37,23 @@ def training_generator(dataset, split="train", from_disk=False, format="text"):
     for row in iter(ds):
         if format == "text":
             text = row["text"]
+            yield {"text": text}
         elif format == "completion":
             text = row["prompt"] + "\n" + row["completion"]
-        yield {"text": text}
+            yield {
+                "text": text,
+                "prompt": row["prompt"],
+                "completion": row["completion"],
+            }
+        else:
+            raise Exception(f"Unknown format: {format}")
 
 
 def fetch_dataset(config):
     if config["dataset"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
-        train_dataset = Dataset.from_generator(
+        train_split = Dataset.from_generator(
             training_generator,
             gen_kwargs={
                 "dataset": config["dataset"]["name"],
@@ -53,7 +62,7 @@ def fetch_dataset(config):
             },
         )
         try:
-            val_dataset = Dataset.from_generator(
+            val_split = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
                     "dataset": config["dataset"]["name"],
@@ -63,9 +72,9 @@ def fetch_dataset(config):
             )
         except:
             print("Unable to create val dataset")
-            val_dataset = None
+            val_split = None
         try:
-            test_dataset = Dataset.from_generator(
+            test_split = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
                     "dataset": config["dataset"]["name"],
@@ -75,7 +84,7 @@ def fetch_dataset(config):
             )
         except:
             print("Unable to create test dataset")
-            test_dataset = None
+            test_split = None
     elif config["dataset"]["type"] == "s3":
         os.makedirs(DATASET_DIR)
         dataset_mover = DatasetMover()
@@ -89,7 +98,7 @@ def fetch_dataset(config):
         )
         print(os.listdir(DATASET_DIR))
         print(os.listdir(f"{DATASET_DIR}/{local_name}"))
-        train_dataset = Dataset.from_generator(
+        train_split = Dataset.from_generator(
             training_generator,
             gen_kwargs={
                 "dataset": f"{DATASET_DIR}/{local_name}",
@@ -99,7 +108,7 @@ def fetch_dataset(config):
             },
         )
         try:
-            val_dataset = Dataset.from_generator(
+            val_split = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
                     "dataset": f"{DATASET_DIR}/{local_name}",
@@ -110,9 +119,9 @@ def fetch_dataset(config):
             )
         except:
             print("Unable to create val dataset")
-            val_dataset = None
+            val_split = None
         try:
-            test_dataset = Dataset.from_generator(
+            test_split = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
                     "dataset": f"{DATASET_DIR}/{local_name}",
@@ -123,10 +132,10 @@ def fetch_dataset(config):
             )
         except:
             print("Unable to create test dataset")
-            test_dataset = None
+            test_split = None
     else:
         raise ValueError(f"Unknown dataset_type: {config['dataset']['type']}")
-    return train_dataset, val_dataset, test_dataset
+    return train_split, val_split, test_split
 
 
 def load_model(config):
@@ -175,6 +184,62 @@ def freeze(model, n_freeze, freeze_embed, module_name="layers"):
     if freeze_embed:
         embed_tokens = _find_mod(model, "embed_tokens")
         embed_tokens.weight.requires_grad_(False)
+
+
+class LLMSampleCB(WandbCallback):
+    def __init__(
+        self,
+        trainer,
+        format,
+        test_split,
+        num_samples=100,
+        max_new_tokens=256,
+        log_model="checkpoint",
+    ):
+        super().__init__()
+        assert format == "completion", "Only completion format supported for now"
+        self._log_model = log_model
+        self.sample_split = []
+        for row in test_split:
+            if random() <= (num_samples / test_split.num_rows):
+                self.sample_split.append(row)
+            if len(self.sample_split) >= num_samples:
+                break
+        self.model, self.tokenizer = trainer.model, trainer.tokenizer
+        self.gen_config = GenerationConfig.from_pretrained(
+            trainer.model.name_or_path, max_new_tokens=max_new_tokens
+        )
+
+    def generate(self, prompt):
+        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt")[
+            "input_ids"
+        ].cuda()
+        with torch.inference_mode():
+            output = self.model.generate(
+                tokenized_prompt, generation_config=self.gen_config
+            )
+        return self.tokenizer.decode(
+            output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True
+        )
+
+    def samples_table(self, examples):
+        records_table = Table(
+            columns=["prompt", "predicted", "actual"]
+            + list(self.gen_config.to_dict().keys())
+        )
+        for example in tqdm(examples, leave=False):
+            prompt = example["prompt"]
+            actual = example["completion"]
+            predicted = self.generate(prompt=prompt)
+            records_table.add_data(
+                prompt, predicted, actual, *list(self.gen_config.to_dict().values())
+            )
+        return records_table
+
+    def on_evaluate(self, args, state, control, **kwargs):
+        super().on_evaluate(args, state, control, **kwargs)
+        records_table = self.samples_table(self.sample_split)
+        self._wandb.log({"sample_predictions": records_table})
 
 
 def train(train_split, val_split, test_split, model, tokenizer, config):
@@ -230,10 +295,18 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
         args=sft_config,
     )
 
+    format = config["dataset"].get("format", "text")
+    if test_split and test_split.num_rows > 0 and format == "completion":
+        # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
+        wandb_callback = LLMSampleCB(
+            trainer, format, test_split, num_samples=15, max_new_tokens=512
+        )
+        trainer.add_callback(wandb_callback)
+
     trainer.train()
 
-    # if test_split:
-    #     trainer.evaluate(test_split)
+    if test_split and test_split.num_rows > 0:
+        trainer.evaluate(test_split)
 
 
 def upload_model(config):
@@ -278,6 +351,8 @@ def main():
     )
     print("Uploading model..")
     upload_model(config)
+
+    finish()
 
 
 if __name__ == "__main__":
