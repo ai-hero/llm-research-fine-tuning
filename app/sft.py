@@ -300,7 +300,11 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
     if test_split and test_split.num_rows > 0 and format == "completion":
         # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
         wandb_callback = LLMSampleCB(
-            trainer, format, test_split, num_samples=15, max_new_tokens=MAX_NEW_TOKENS
+            trainer,
+            format,
+            test_split,
+            num_samples=15,
+            max_new_tokens=config["training"]["trainer"]["max_seq_length"],
         )
         trainer.add_callback(wandb_callback)
 
