@@ -1,0 +1,12 @@
+# Code QA
+python-dotenv
+black
+mypy
+ruff
+pytest
+isort
+blacken-docs
+pyupgrade
+detect-secrets
+tomli
+pre-commit
