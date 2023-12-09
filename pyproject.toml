@@ -38,8 +38,10 @@ exclude = [
 ignore = []
 line-length = 120
 select = [
+    "D",
     "E",
     "F",
+    "I",
     "W",
 ]
 src = ["app", "tests"]

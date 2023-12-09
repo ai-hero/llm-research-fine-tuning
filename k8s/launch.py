@@ -1,3 +1,4 @@
+"""Script used to launch a Kubernetes job for training a model."""
 import base64
 import glob
 import os
@@ -16,12 +17,14 @@ load_dotenv()
 
 # Function to base64 encode
 def b64encode_filter(s: str) -> str:
+    """Base64 encode a string. Used in Jinja2 template."""
     if s is not None:
         return base64.b64encode(s.encode()).decode()
     return None
 
 
 def train(container_image: str, config_file: str = "guanaco_peft.yaml") -> None:
+    """Launch a Kubernetes job for training a model."""
     job_name = codenamize(f"{config_file}-{time.time()}")
     print(f"Job name: {job_name}")
 
@@ -94,6 +97,7 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml") -> None:
 
 
 def delete(job_name: str) -> None:
+    """Delete a Kubernetes job and other artifacts."""
     assert job_name, "You need to provide job_name"
     # Use subprocess.Popen with communicate to delete the Kubernetes job
     with subprocess.Popen(["kubectl", "delete", "job", job_name], stdin=subprocess.PIPE, text=True) as proc:

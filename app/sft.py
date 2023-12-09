@@ -1,3 +1,4 @@
+"""Launch the training job inside a container."""
 import os
 from random import random
 from typing import Any, Generator, Tuple
@@ -17,8 +18,9 @@ from transformers import (
 )
 from transformers.integrations import WandbCallback
 from trl import SFTTrainer
-from utils import DatasetMover
 from wandb import Table, finish
+
+from utils import DatasetMover
 
 DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
 MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
@@ -30,17 +32,23 @@ MAX_NEW_TOKENS = 512
 def training_generator(
     dataset: str, split: str = "train", from_disk: bool = False, format: str = "text"
 ) -> Generator[dict[str, Any], dict[str, Any], None]:
+    """Generate training data by yielding each row in the dataset split."""
+    # We assume that the dataset is a HuggingFace dataset, and a DatasetDict
+    # such that the dict has train, val, and test splits.
     if from_disk:
         ds = load_from_disk(dataset)
         ds = ds[split]
     else:
         ds = load_dataset(dataset, streaming=True, split=split)
+
+    # Iterate through the dataset and yield each row
     print(f"{ds.num_rows} rows in {split} split")
     for row in iter(ds):
         if format == "text":
             text = row["text"]
             yield {"text": text}
         elif format == "completion":
+            # If the dataset is a 'completion' format dataset, we need to concatenate the prompt and completion
             text = row["prompt"] + "\n" + row["completion"]
             yield {
                 "text": text,
@@ -52,6 +60,7 @@ def training_generator(
 
 
 def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
+    """Fetch the dataset from HuggingFace Hub or S3."""
     if config["dataset"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
@@ -139,6 +148,7 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
 
 
 def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+    """Load the model from HuggingFace Hub or S3."""
     if config["model"]["base"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
@@ -159,6 +169,7 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
 
 
 def freeze(model: AutoModelForCausalLM, n_freeze: int, freeze_embed: bool, module_name: str = "layers") -> None:
+    """Freeze the model layers for SFT without PEFT."""
     if n_freeze > 0:
 
         def _find_mod(model: AutoModelForCausalLM, module_name: str) -> Any:
@@ -185,6 +196,8 @@ def freeze(model: AutoModelForCausalLM, n_freeze: int, freeze_embed: bool, modul
 
 
 class LLMSampleCB(WandbCallback):  # type: ignore
+    """Callback for sampling from a LLM and reporting custom eval to WANDB."""
+
     def __init__(
         self: "LLMSampleCB",
         trainer: SFTTrainer,
@@ -194,9 +207,13 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         max_new_tokens: int = MAX_NEW_TOKENS,
         log_model: str = "checkpoint",
     ):
+        """Initialize the callback by extracting a few rows from the test split."""
         super().__init__()
         assert format == "completion", "Only completion format supported for now"
         self._log_model = log_model
+
+        # Sample a few rows from the test split to generate a table of predictions
+        # for visual inspection a.k.a. spot checking
         self.sample_split = []
         for row in test_split:
             if random() <= (num_samples / test_split.num_rows):
@@ -207,12 +224,14 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
 
     def generate(self: "LLMSampleCB", prompt: str) -> Any:
+        """Generate a completion from a prompt."""
         tokenized_prompt = self.tokenizer(prompt, return_tensors="pt")["input_ids"].cuda()
         with torch.inference_mode():
             output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
         return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
 
     def samples_table(self: "LLMSampleCB", examples: list[dict[str, Any]]) -> Table:
+        """Generate a table of predictions for visual inspection."""
         records_table = Table(columns=["prompt", "predicted", "actual"] + list(self.gen_config.to_dict().keys()))
         for example in tqdm(examples, leave=False):
             prompt = example["prompt"]
@@ -222,6 +241,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         return records_table
 
     def on_evaluate(self: "LLMSampleCB", args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
+        """Log the sample predictions to WANDB on eval callback."""
         super().on_evaluate(args, state, control, **kwargs)
         records_table = self.samples_table(self.sample_split)
         self._wandb.log({"sample_predictions": records_table})
@@ -235,6 +255,7 @@ def train(
     tokenizer: AutoTokenizer,
     config: dict[str, Any],
 ) -> None:
+    """Start training the model as defined by the config."""
     # Assumes model is a causal language model
     model.config.use_cache = False
 
@@ -300,6 +321,7 @@ def train(
 
 
 def upload_model(config: dict[str, Any]) -> None:
+    """Upload the model to HuggingFace Hub or S3."""
     if "output" not in config["model"]:
         return
     if config["model"]["output"]["type"] == "hf":
@@ -317,6 +339,7 @@ def upload_model(config: dict[str, Any]) -> None:
 
 
 def main() -> None:
+    """Run the train by downloading dataset, run train, and upload model."""
     if os.path.exists(MOUNTED_CONFIG_PATH):
         config_file = MOUNTED_CONFIG_PATH
         print("Loading mounted config")
