@@ -14,9 +14,17 @@ Update [k8s/yamls/config.yaml](k8s/yamls/config.yaml).
 cd k8s/
 python launch.py train rparundekar/fine_tune_research:20231205_08 alpaca_peft.yaml
 ```
-You'll see the name of the job. 
+You'll see the name of the job.
 
 ## Deleting a job
 ```sh
 python launch.py delete <job-name>
+```
+
+
+## Code QA
+```
+pre-commit install
+pre-commit autoupdate
+pre-commit run --all-files
 ```

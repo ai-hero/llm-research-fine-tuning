@@ -23,6 +23,9 @@ testpaths = "tests"
 [tool.black]
 line_length = 120
 
+[tool.isort]
+profile = "black"
+
 [tool.ruff]
 exclude = [
     ".venv",
@@ -38,10 +41,10 @@ select = [
     "E",
     "F",
     "W",
-    "I001",
 ]
 src = ["app", "tests"]
 
 [mypy]
 files = ["app", "k8s"]
 strict_optional = false
+warn_unused_ignores = false

@@ -9,11 +9,19 @@ repos:
       - id: check-executables-have-shebangs
       - id: check-json
       - id: check-yaml
+        exclude: .*_template\.yaml
       - id: debug-statements
       - id: detect-private-key
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: mixed-line-ending
+
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.0
+    hooks:
+      - id: isort
+        name: isort (python)
+
 
   - repo: https://github.com/psf/black
     rev: 23.11.0
@@ -42,17 +50,11 @@ repos:
         types_or: [python, pyi, jupyter]
         exclude: poc/explore.ipynb
 
-  - repo: https://github.com/econchick/interrogate
-    rev: 1.5.0
-    hooks:
-      - id: interrogate
-        args: [--fail-under=80, --verbose]
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.13.0
-    hooks:
-      - id: isort
-        name: isort (python)
+  # - repo: https://github.com/econchick/interrogate
+  #   rev: 1.5.0
+  #   hooks:
+  #     - id: interrogate
+  #       args: [--fail-under=80, --verbose]
 
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.15.0

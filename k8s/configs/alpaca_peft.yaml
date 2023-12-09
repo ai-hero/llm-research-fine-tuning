@@ -1,7 +1,7 @@
 project:
   name: "fine_tune_research"
-  
-dataset:  
+
+dataset:
   type: "s3"
   name: "fine-tuning-research/alpaca"
   format: "text"
@@ -41,7 +41,7 @@ training:
     bias: "none" # add bias to the nn.Linear layers?
     task_type: "CAUSAL_LM"
     target_modules:  # the name of the layers to add LoRA
-      - "q_proj" 
+      - "q_proj"
       - "k_proj"
-      - "v_proj" 
+      - "v_proj"
       - "o_proj"

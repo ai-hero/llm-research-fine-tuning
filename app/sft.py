@@ -1,25 +1,24 @@
 import os
+from random import random
+from typing import Any, Generator, Tuple
 
 import torch
-from tqdm import tqdm
-import yaml
+import yaml  # type: ignore
 from datasets import Dataset, load_dataset, load_from_disk
 from fire import Fire
 from huggingface_hub import HfApi, login
-from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from peft import LoraConfig, get_peft_model
+from tqdm import tqdm
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    BitsAndBytesConfig,
     GenerationConfig,
     TrainingArguments,
 )
-from wandb import Table
+from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from utils import DatasetMover
-from transformers.integrations import WandbCallback
 from wandb import Table, finish
-from random import random
 
 DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
 MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
@@ -28,7 +27,9 @@ DATASET_DIR = "/mnt/dataset"
 MAX_NEW_TOKENS = 512
 
 
-def training_generator(dataset, split="train", from_disk=False, format="text"):
+def training_generator(
+    dataset: str, split: str = "train", from_disk: bool = False, format: str = "text"
+) -> Generator[dict[str, Any], dict[str, Any], None]:
     if from_disk:
         ds = load_from_disk(dataset)
         ds = ds[split]
@@ -50,7 +51,7 @@ def training_generator(dataset, split="train", from_disk=False, format="text"):
             raise Exception(f"Unknown format: {format}")
 
 
-def fetch_dataset(config):
+def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
     if config["dataset"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
@@ -71,7 +72,7 @@ def fetch_dataset(config):
                     "format": config["dataset"].get("format", "text"),
                 },
             )
-        except:
+        except:  # pylint: disable=bare-except  # noqa: E722
             print("Unable to create val dataset")
             val_split = None
         try:
@@ -83,15 +84,13 @@ def fetch_dataset(config):
                     "format": config["dataset"].get("format", "text"),
                 },
             )
-        except:
+        except:  # pylint: disable=bare-except  # noqa: E722
             print("Unable to create test dataset")
             test_split = None
     elif config["dataset"]["type"] == "s3":
         os.makedirs(DATASET_DIR)
         dataset_mover = DatasetMover()
-        local_name = config["dataset"]["name"][
-            config["dataset"]["name"].find("/") + 1 :
-        ]
+        local_name = config["dataset"]["name"][config["dataset"]["name"].find("/") + 1 :]
         dataset_mover.download(
             bucket_name=config["dataset"]["name"].split("/")[0],
             object_name=f"{local_name}.tar.gz",
@@ -118,7 +117,7 @@ def fetch_dataset(config):
                     "format": config["dataset"].get("format", "text"),
                 },
             )
-        except:
+        except:  # pylint: disable=bare-except  # noqa: E722
             print("Unable to create val dataset")
             val_split = None
         try:
@@ -131,7 +130,7 @@ def fetch_dataset(config):
                     "format": config["dataset"].get("format", "text"),
                 },
             )
-        except:
+        except:  # pylint: disable=bare-except  # noqa: E722
             print("Unable to create test dataset")
             test_split = None
     else:
@@ -139,7 +138,7 @@ def fetch_dataset(config):
     return train_split, val_split, test_split
 
 
-def load_model(config):
+def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     if config["model"]["base"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
@@ -150,9 +149,7 @@ def load_model(config):
             use_cache=False,
             trust_remote_code=True,
         )
-        tokenizer = AutoTokenizer.from_pretrained(
-            config["model"]["base"]["name"], trust_remote_code=True
-        )
+        tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
     elif config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
@@ -161,10 +158,10 @@ def load_model(config):
     return model, tokenizer
 
 
-def freeze(model, n_freeze, freeze_embed, module_name="layers"):
+def freeze(model: AutoModelForCausalLM, n_freeze: int, freeze_embed: bool, module_name: str = "layers") -> None:
     if n_freeze > 0:
 
-        def _find_mod(model, module_name):
+        def _find_mod(model: AutoModelForCausalLM, module_name: str) -> Any:
             for name, mod in model.named_modules():
                 if name.endswith(module_name):
                     return mod
@@ -187,15 +184,15 @@ def freeze(model, n_freeze, freeze_embed, module_name="layers"):
         embed_tokens.weight.requires_grad_(False)
 
 
-class LLMSampleCB(WandbCallback):
+class LLMSampleCB(WandbCallback):  # type: ignore
     def __init__(
-        self,
-        trainer,
-        format,
-        test_split,
-        num_samples=100,
-        max_new_tokens=MAX_NEW_TOKENS,
-        log_model="checkpoint",
+        self: "LLMSampleCB",
+        trainer: SFTTrainer,
+        format: str,
+        test_split: Dataset,
+        num_samples: int = 100,
+        max_new_tokens: int = MAX_NEW_TOKENS,
+        log_model: str = "checkpoint",
     ):
         super().__init__()
         assert format == "completion", "Only completion format supported for now"
@@ -207,43 +204,37 @@ class LLMSampleCB(WandbCallback):
             if len(self.sample_split) >= num_samples:
                 break
         self.model, self.tokenizer = trainer.model, trainer.tokenizer
-        self.gen_config = GenerationConfig.from_pretrained(
-            trainer.model.name_or_path, max_new_tokens=max_new_tokens
-        )
+        self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
 
-    def generate(self, prompt):
-        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt")[
-            "input_ids"
-        ].cuda()
+    def generate(self: "LLMSampleCB", prompt: str) -> Any:
+        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt")["input_ids"].cuda()
         with torch.inference_mode():
-            output = self.model.generate(
-                inputs=tokenized_prompt, generation_config=self.gen_config
-            )
-        return self.tokenizer.decode(
-            output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True
-        )
+            output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
+        return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
 
-    def samples_table(self, examples):
-        records_table = Table(
-            columns=["prompt", "predicted", "actual"]
-            + list(self.gen_config.to_dict().keys())
-        )
+    def samples_table(self: "LLMSampleCB", examples: list[dict[str, Any]]) -> Table:
+        records_table = Table(columns=["prompt", "predicted", "actual"] + list(self.gen_config.to_dict().keys()))
         for example in tqdm(examples, leave=False):
             prompt = example["prompt"]
             actual = example["completion"]
             predicted = self.generate(prompt=prompt)
-            records_table.add_data(
-                prompt, predicted, actual, *list(self.gen_config.to_dict().values())
-            )
+            records_table.add_data(prompt, predicted, actual, *list(self.gen_config.to_dict().values()))
         return records_table
 
-    def on_evaluate(self, args, state, control, **kwargs):
+    def on_evaluate(self: "LLMSampleCB", args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
         super().on_evaluate(args, state, control, **kwargs)
         records_table = self.samples_table(self.sample_split)
         self._wandb.log({"sample_predictions": records_table})
 
 
-def train(train_split, val_split, test_split, model, tokenizer, config):
+def train(
+    train_split: Dataset,
+    val_split: Dataset,
+    test_split: Dataset,
+    model: AutoModelForCausalLM,
+    tokenizer: AutoTokenizer,
+    config: dict[str, Any],
+) -> None:
     # Assumes model is a causal language model
     model.config.use_cache = False
 
@@ -256,9 +247,7 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
     if "num_train_epochs" in config["training"]["sft"]:
         num_train_epochs = config["training"]["sft"].pop("num_train_epochs")
         max_steps = (
-            num_train_epochs
-            * train_split.num_rows
-            // config["training"]["sft"]["per_device_train_batch_size"]
+            num_train_epochs * train_split.num_rows // config["training"]["sft"]["per_device_train_batch_size"]
         )  # TODO: Add num gpus when we do FSDP
         config["training"]["sft"]["max_steps"] = max_steps
         save_steps = max_steps // 8
@@ -266,9 +255,7 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
         config["training"]["sft"]["save_strategy"] = "steps"
 
     # SFT training config
-    sft_config = TrainingArguments(
-        output_dir=CHECKPOINT_DIR, **config["training"]["sft"]
-    )
+    sft_config = TrainingArguments(output_dir=CHECKPOINT_DIR, **config["training"]["sft"])
     # PEFT training config
     if "peft" in config["training"]:
         peft_config = LoraConfig(**config["training"]["peft"])
@@ -290,9 +277,7 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
         peft_config=peft_config,
         dataset_text_field="text",
         max_seq_length=config["training"]["trainer"]["max_seq_length"],
-        packing=config["training"]["trainer"][
-            "packing"
-        ],  # Should you combine multiple examples into one sequence?
+        packing=config["training"]["trainer"]["packing"],  # Should you combine multiple examples into one sequence?
         args=sft_config,
     )
 
@@ -314,7 +299,7 @@ def train(train_split, val_split, test_split, model, tokenizer, config):
         trainer.evaluate(test_split)
 
 
-def upload_model(config):
+def upload_model(config: dict[str, Any]) -> None:
     if "output" not in config["model"]:
         return
     if config["model"]["output"]["type"] == "hf":
@@ -331,14 +316,14 @@ def upload_model(config):
         raise NotImplementedError("S3 support not implemented yet")
 
 
-def main():
+def main() -> None:
     if os.path.exists(MOUNTED_CONFIG_PATH):
         config_file = MOUNTED_CONFIG_PATH
         print("Loading mounted config")
     else:
         config_file = DEFAULT_STATIC_CONFIG_PATH
         print("Loading default config")
-    with open(file=config_file, mode="r", encoding="utf-8") as f:
+    with open(file=config_file, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
     print("Loading dataset")

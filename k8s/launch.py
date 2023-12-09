@@ -1,26 +1,27 @@
-import os
-from fire import Fire
-import glob
 import base64
+import glob
+import os
 import subprocess
-from jinja2 import Environment, FileSystemLoader
-from dotenv import load_dotenv
-import yaml
 import time
+
+import yaml  # type: ignore
 from codenamize import codenamize
+from dotenv import load_dotenv
+from fire import Fire
+from jinja2 import Environment, FileSystemLoader
 
 # Load environment variables
 load_dotenv()
 
 
 # Function to base64 encode
-def b64encode_filter(s):
+def b64encode_filter(s: str) -> str:
     if s is not None:
         return base64.b64encode(s.encode()).decode()
     return None
 
 
-def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
+def train(container_image: str, config_file: str = "guanaco_peft.yaml") -> None:
     job_name = codenamize(f"{config_file}-{time.time()}")
     print(f"Job name: {job_name}")
 
@@ -47,9 +48,7 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
     yaml_dir = os.path.join(os.path.dirname(__file__), "yamls")
 
     # Load training config file and extract dataset name
-    with open(
-        os.path.join(os.path.dirname(__file__), "configs", config_file), "r"
-    ) as f:
+    with open(os.path.join(os.path.dirname(__file__), "configs", config_file)) as f:
         training_config = yaml.safe_load(f)
     dataset_name = training_config["dataset"]["name"]
     project_name = training_config["project"]["name"]
@@ -83,9 +82,7 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
             rendered_template = yaml.dump(config)
 
         # Use subprocess.Popen with communicate to apply the Kubernetes configuration
-        with subprocess.Popen(
-            ["kubectl", "apply", "-f", "-"], stdin=subprocess.PIPE, text=True
-        ) as proc:
+        with subprocess.Popen(["kubectl", "apply", "-f", "-"], stdin=subprocess.PIPE, text=True) as proc:
             proc.communicate(rendered_template)
 
     print(f"Applied Kubernetes configuration from {yaml_file}")
@@ -93,31 +90,23 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml"):
     print(f"Launched job name: {job_name}")
     print(f"1. To see status, run: kubectl describe job/{job_name}")
     print(f"2. To see logs, run: kubectl logs job/{job_name} -f")
-    print(
-        f"3. To delete job and other artifacts, run: python launch.py delete {job_name}"
-    )
+    print(f"3. To delete job and other artifacts, run: python launch.py delete {job_name}")
 
 
-def delete(job_name: str):
+def delete(job_name: str) -> None:
     assert job_name, "You need to provide job_name"
     # Use subprocess.Popen with communicate to delete the Kubernetes job
-    with subprocess.Popen(
-        ["kubectl", "delete", "job", job_name], stdin=subprocess.PIPE, text=True
-    ) as proc:
+    with subprocess.Popen(["kubectl", "delete", "job", job_name], stdin=subprocess.PIPE, text=True) as proc:
         proc.communicate()
     print(f"Deleted Kubernetes job {job_name}")
 
     # Use subprocess.Popen with communicate to delete the Kubernetes job
-    with subprocess.Popen(
-        ["kubectl", "delete", "service", job_name], stdin=subprocess.PIPE, text=True
-    ) as proc:
+    with subprocess.Popen(["kubectl", "delete", "service", job_name], stdin=subprocess.PIPE, text=True) as proc:
         proc.communicate()
     print(f"Deleted Kubernetes service {job_name}")
 
     # Use subprocess.Popen with communicate to delete the Kubernetes job
-    with subprocess.Popen(
-        ["kubectl", "delete", "configmap", job_name], stdin=subprocess.PIPE, text=True
-    ) as proc:
+    with subprocess.Popen(["kubectl", "delete", "configmap", job_name], stdin=subprocess.PIPE, text=True) as proc:
         proc.communicate()
     print(f"Deleted Kubernetes configmap {job_name}")
 
