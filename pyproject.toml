@@ -1,15 +1,14 @@
 [project]
-name = "AI Hero Fine-Tuning Reserch"
+name = "Fine-Tuning Reserch"
 version = "0.1.0"
 description = "Open source research on fine-tuning LLMs"
-authors = ["Rahul Parundekar <rahul@aihero.studio>"]
+authors = ["Rahul Parundekar <rahul@aihero.studio>", "Shankar Ganesan <gshankar.87@gmail.com>"]
 license = "MIT"
 readme = "README.md"
 homepage = "https://aihero.studio"
 repository = "https://github.com/ai-hero/python-project-template"
 classifiers = [
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -22,9 +21,7 @@ testpaths = "tests"
 
 [tool.black]
 line_length = 120
-
-[tool.isort]
-profile = "black"
+target_version = ['py39']
 
 [tool.ruff]
 exclude = [
