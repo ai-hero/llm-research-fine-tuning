@@ -316,8 +316,8 @@ def train(
 
     trainer.train()
 
-    if test_split and test_split.num_rows > 0:
-        trainer.evaluate(test_split)
+    # if test_split and test_split.num_rows > 0:
+    #     trainer.evaluate(test_split)
 
 
 def upload_model(config: dict[str, Any]) -> None:
