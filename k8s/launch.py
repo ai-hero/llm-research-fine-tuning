@@ -78,7 +78,7 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml") -> None:
             wandb_tags=wandb_tags,
             config_file=config_file,
         )
-        if "config.yaml" == yaml_file.split("/")[-1]:
+        if "config_template.yaml" == yaml_file.split("/")[-1]:
             # Set the training config as the string value for config map
             config = yaml.safe_load(rendered_template)
             config["data"]["config.yaml"] = yaml.dump(training_config)
