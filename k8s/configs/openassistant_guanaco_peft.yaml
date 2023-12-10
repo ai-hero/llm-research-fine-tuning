@@ -1,9 +1,9 @@
 project:
-  name: "fine_tune_research"
+  name: "openassistant-guanaco"
 
 dataset:
-  type: "hf"
-  name: "mlabonne/guanaco-llama2-1k"
+  type: "s3"
+  name: "fine-tuning-research/openassistant-guanaco"
   format: "text"
 
 model:
@@ -12,7 +12,7 @@ model:
     name: "meta-llama/Llama-2-7b-hf"
   output:
     type: "hf"
-    name: "rparundekar/llama2-7b-guanaco"
+    name: "rparundekar/llama2-7b-openassistant-guanaco"
 
 training:
   trainer:

@@ -1,0 +1,49 @@
+[project]
+name = "Fine-Tuning Reserch"
+version = "0.1.0"
+description = "Open source research on fine-tuning LLMs"
+authors = ["Rahul Parundekar <rahul@aihero.studio>", "Shankar Ganesan <gshankar.87@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+homepage = "https://aihero.studio"
+repository = "https://github.com/ai-hero/fine_tune_research"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "License :: OSI Approved :: MIT License",
+]
+
+[tool.pytest.ini_options]
+addopts = "-vvv"
+testpaths = "tests"
+
+[tool.black]
+line_length = 120
+target_version = ['py39']
+
+[tool.ruff]
+exclude = [
+    ".venv",
+    ".git",
+    "__pycache__",
+    "build",
+    "dist",
+    "venv",
+]
+ignore = []
+line-length = 120
+select = [
+    "D",
+    "E",
+    "F",
+    "I",
+    "W",
+]
+src = ["app", "tests"]
+
+[mypy]
+files = ["app", "k8s"]
+strict_optional = false
+warn_unused_ignores = false

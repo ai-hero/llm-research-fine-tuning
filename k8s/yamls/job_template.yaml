@@ -19,7 +19,7 @@ spec:
             nvidia.com/gpu: 1
             memory: 32Gi
             cpu: 8
-        imagePullPolicy: Always    
+        imagePullPolicy: Always
         command:
         - bash
         - "-c"

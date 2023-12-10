@@ -12,3 +12,4 @@ wandb==0.15.12
 python-dotenv
 minio
 fire
+types-PyYAML
