@@ -92,11 +92,22 @@ spec:
               key: s3_secure
         {% endif %}
 
-    {% if config_file %}
+        {% if config_file %}
         volumeMounts:
           - mountPath: "/mnt/config/training"
             name: training-config
             readOnly: true
+        {% endif %}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: gpu.nvidia.com/class
+                operator: In
+                values:
+                  - A100_PCIE_40GB
+    {% if config_file %}
       volumes:
         - name: training-config
           configMap:

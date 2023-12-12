@@ -25,7 +25,7 @@ training:
     learning_rate: 0.0002
     lr_scheduler_type: "cosine"
     warmup_ratio: 0.1
-    num_train_epochs: 10
+    num_train_epochs: 2
     gradient_accumulation_steps: 4
     gradient_checkpointing: True
     gradient_checkpointing_kwargs:
