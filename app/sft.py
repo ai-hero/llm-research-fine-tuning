@@ -10,12 +10,7 @@ from fire import Fire
 from huggingface_hub import HfApi, login
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    GenerationConfig,
-    TrainingArguments,
-)
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, GenerationConfig, TrainingArguments
 from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
@@ -149,16 +144,52 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
 
 def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     """Load the model from HuggingFace Hub or S3."""
+    use_4bit = config["training"].get("peft", {}).pop("quantized", False)
+
+    if use_4bit:
+        # Compute dtype for 4-bit base models
+        bnb_4bit_compute_dtype = "float16"
+        # Quantization type (fp4 or nf4)
+        bnb_4bit_quant_type = "nf4"
+        # Activate nested quantization for 4-bit base models (double quantization)
+        use_nested_quant = False
+
+        # Load tokenizer and model with QLoRA configuration
+        compute_dtype = getattr(torch, bnb_4bit_compute_dtype)
+
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=use_4bit,
+            bnb_4bit_quant_type=bnb_4bit_quant_type,
+            bnb_4bit_compute_dtype=compute_dtype,
+            bnb_4bit_use_double_quant=use_nested_quant,
+        )
+
+        # Check GPU compatibility with bfloat16
+        if compute_dtype == torch.float16 and use_4bit:
+            major, _ = torch.cuda.get_device_capability()
+            if major >= 8:
+                print("=" * 80)
+                print("Your GPU supports bfloat16: accelerate training with bf16=True")
+                print("=" * 80)
+
     if config["model"]["base"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
 
-        model = AutoModelForCausalLM.from_pretrained(
-            config["model"]["base"]["name"],
-            torch_dtype=torch.bfloat16,
-            use_cache=False,
-            trust_remote_code=True,
-        )
+        if use_4bit:
+            # Load base model
+            model = AutoModelForCausalLM.from_pretrained(
+                config["model"]["base"]["name"], quantization_config=bnb_config, device_map={"": 0}
+            )
+            model.config.use_cache = False
+            model.config.pretraining_tp = 1
+        else:
+            model = AutoModelForCausalLM.from_pretrained(
+                config["model"]["base"]["name"],
+                torch_dtype=torch.bfloat16,
+                use_cache=False,
+                trust_remote_code=True,
+            )
         tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
     elif config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
