@@ -21,12 +21,16 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set short git commit SHA
+        id: short_sha
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
       -
         name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: rparundekar/fine_tune_research:${{GITHUB_SHA::7}}
+          tags: rparundekar/fine_tune_research:${{ env.SHORT_SHA }}
           cache-from: type=registry,ref=rparundekar/fine_tune_research:latest
           cache-to: type=inline
