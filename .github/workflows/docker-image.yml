@@ -1,8 +1,7 @@
 name: Docker Image Creation
-
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "*" ]
 jobs:
   build:
     runs-on: ubuntu-latest
