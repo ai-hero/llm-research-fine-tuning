@@ -28,6 +28,9 @@ jobs:
           context: .
           push: true
           tags: rparundekar/fine_tune_research:${{ github.sha }}
+          cache-to: |
+            rparundekar/fine_tune_research:cache
+            type=registry,ref=rparundekar/fine_tune_research
           cache-from: |
             rparundekar/fine_tune_research:cache
             type=registry,ref=rparundekar/fine_tune_research
