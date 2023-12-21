@@ -190,9 +190,7 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
                 use_cache=False,
                 trust_remote_code=True,
             )
-        tokenizer = AutoTokenizer.from_pretrained(
-            config["model"]["base"]["name"], add_eos_token=True, trust_remote_code=True
-        )
+        tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
     elif config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")

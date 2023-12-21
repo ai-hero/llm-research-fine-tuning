@@ -1,5 +1,5 @@
 project:
-  name: "fine_tune_research"
+  name: "llmos"
 
 dataset:
   type: "s3"
@@ -12,7 +12,7 @@ model:
     name: "meta-llama/Llama-2-7b-hf"
   output:
     type: "hf"
-    name: "rparundekar/llama2-7b-mmlu"
+    name: "rparundekar/llama2-7b-llmos"
 
 training:
   trainer:
@@ -25,7 +25,7 @@ training:
     learning_rate: 0.0002
     lr_scheduler_type: "cosine"
     warmup_ratio: 0.1
-    num_train_epochs: 1
+    max_steps: 500
     gradient_accumulation_steps: 4
     gradient_checkpointing: True
     gradient_checkpointing_kwargs:
