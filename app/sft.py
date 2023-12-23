@@ -213,7 +213,10 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
             )
         tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
         # May need to have some custom padding logic here
-        tokenizer.pad_token = tokenizer.eos_token
+        if "llama" in config["model"]["base"]["name"]:
+            tokenizer.pad_token_id = 18610
+        else:
+            tokenizer.pad_token_id = tokenizer.eos_token_id
         tokenizer.padding_side = "right"
 
     elif config["model"]["base"]["type"] == "s3":
@@ -281,7 +284,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
     def generate(self: "LLMSampleCB", prompt: str) -> Any:
         """Generate a completion from a prompt."""
-        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt")["input_ids"].cuda()
+        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
         with torch.inference_mode():
             output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
         return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
