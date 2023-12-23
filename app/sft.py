@@ -291,7 +291,6 @@ def train(
     model.config.use_cache = False
 
     # May need to have some custom padding logic here
-    tokenizer.add_special_tokens({"pad_token": "[PAD]"})
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
