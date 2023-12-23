@@ -213,11 +213,10 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
             )
         tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
         # May need to have some custom padding logic here
-        if "llama" in config["model"]["base"]["name"]:
-            tokenizer.pad_token_id = 18610
-        else:
-            tokenizer.pad_token_id = tokenizer.eos_token_id
+        tokenizer.add_special_tokens({"pad_token": "[PAD]"})
         tokenizer.padding_side = "right"
+        model.config.pad_token_id = tokenizer.pad_token_id
+        model.resize_token_embeddings(len(tokenizer))
 
     elif config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
