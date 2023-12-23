@@ -25,7 +25,7 @@ MAX_NEW_TOKENS = 512
 
 
 def training_generator(
-    dataset: str, split: str = "train", from_disk: bool = False, format: str = "text"
+    dataset: str, split: str = "train", from_disk: bool = False, format: str = "text", tokenizer: Any = None
 ) -> Generator[dict[str, Any], dict[str, Any], None]:
     """Generate training data by yielding each row in the dataset split."""
     # We assume that the dataset is a HuggingFace dataset, and a DatasetDict
@@ -40,11 +40,15 @@ def training_generator(
     print(f"{ds.num_rows} rows in {split} split")
     for row in iter(ds):
         if format == "text":
-            text = row["text"]
+            text = f"{row['text']}"
+            if not text.startswith(tokenizer.bos_token):
+                text = f"{tokenizer.bos_token}{text}{tokenizer.eos_token}"
             yield {"text": text}
         elif format == "completion":
             # If the dataset is a 'completion' format dataset, we need to concatenate the prompt and completion
-            text = row["prompt"] + "\n" + row["completion"]
+            text = f"{row['prompt']}\n{row['completion']}"
+            if not text.startswith(tokenizer.bos_token):
+                text = f"{tokenizer.bos_token}{text}{tokenizer.eos_token}"
             yield {
                 "text": text,
                 "prompt": row["prompt"],
@@ -54,7 +58,7 @@ def training_generator(
             raise Exception(f"Unknown format: {format}")
 
 
-def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
+def fetch_dataset(config: dict[str, Any], tokenizer: Any) -> Tuple[Dataset, Dataset, Dataset]:
     """Fetch the dataset from HuggingFace Hub or S3."""
     if config["dataset"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
@@ -65,6 +69,7 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                 "dataset": config["dataset"]["name"],
                 "split": "train",
                 "format": config["dataset"].get("format", "text"),
+                "tokenizer": tokenizer,
             },
         )
         try:
@@ -74,6 +79,7 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                     "dataset": config["dataset"]["name"],
                     "split": "val",
                     "format": config["dataset"].get("format", "text"),
+                    "tokenizer": tokenizer,
                 },
             )
         except:  # pylint: disable=bare-except  # noqa: E722
@@ -86,6 +92,7 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                     "dataset": config["dataset"]["name"],
                     "split": "test",
                     "format": config["dataset"].get("format", "text"),
+                    "tokenizer": tokenizer,
                 },
             )
         except:  # pylint: disable=bare-except  # noqa: E722
@@ -191,6 +198,10 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
                 trust_remote_code=True,
             )
         tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
+        # May need to have some custom padding logic here
+        tokenizer.pad_token = tokenizer.eos_token
+        tokenizer.padding_side = "right"
+
     elif config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
@@ -290,10 +301,6 @@ def train(
     # Assumes model is a causal language model
     model.config.use_cache = False
 
-    # May need to have some custom padding logic here
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
-
     # Calculate max steps from num epochs
     if "num_train_epochs" in config["training"]["sft"]:
         num_train_epochs = config["training"]["sft"].pop("num_train_epochs")
@@ -379,10 +386,10 @@ def main() -> None:
     with open(file=config_file, encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    print("Loading dataset")
-    train_split, val_split, test_split = fetch_dataset(config)
     print("Loading model")
     model, tokenizer = load_model(config)
+    print("Loading dataset")
+    train_split, val_split, test_split = fetch_dataset(config=config, tokenizer=tokenizer)
     print("Starting training")
     train(
         train_split=train_split,
