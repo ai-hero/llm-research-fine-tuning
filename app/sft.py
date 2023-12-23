@@ -51,7 +51,7 @@ def training_generator(
             yield {"text": text}
         elif format == "completion":
             # If the dataset is a 'completion' format dataset, we need to concatenate the prompt and completion
-            text = f"{row['prompt']}\n{row['completion']}"
+            text = f"{row['prompt']}{row['completion']}"
             if not text.startswith(bos_token):
                 text = f"{bos_token}{text}{eos_token}"
             yield {
@@ -290,7 +290,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         """Generate a table of predictions for visual inspection."""
         records_table = Table(columns=["prompt", "predicted", "actual"] + list(self.gen_config.to_dict().keys()))
         for example in tqdm(examples, leave=False):
-            prompt = f"{example['prompt']}\n"
+            prompt = example["prompt"]
             if not prompt.startswith(self.tokenizer.bos_token):
                 prompt = f"{self.tokenizer.bos_token}{prompt}"
             actual = example["completion"]
