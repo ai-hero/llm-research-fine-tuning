@@ -123,6 +123,11 @@ def delete(job_name: str) -> None:
         proc.communicate()
     print(f"Deleted Kubernetes configmap {job_name}")
 
+    # Use subprocess.Popen with communicate to delete the Kubernetes job
+    with subprocess.Popen(["kubectl", "delete", "secret", job_name], stdin=subprocess.PIPE, text=True) as proc:
+        proc.communicate()
+    print(f"Deleted Kubernetes secret {job_name}")
+
 
 if __name__ == "__main__":
     Fire(
