@@ -1,10 +1,10 @@
 project:
-  name: "fine_tune_research"
+  name: "open-instruct"
 
 dataset:
-  type: "hf"
-  name: "Clinton/Text-to-sql-v1"
-  format: "text"
+  type: "s3"
+  name: "fine-tuning-research/open-instruct"
+  format: "completion"
 
 model:
   base:
@@ -12,7 +12,7 @@ model:
     name: "meta-llama/Llama-2-7b-hf"
   output:
     type: "hf"
-    name: "rparundekar/llama2-7b-text-to-sql"
+    name: "rparundekar/llama2-7b-open-instruct"
 
 training:
   trainer:
@@ -25,13 +25,15 @@ training:
     learning_rate: 0.0002
     lr_scheduler_type: "cosine"
     warmup_ratio: 0.1
-    num_train_epochs: 1
+    num_train_epochs: 2
     gradient_accumulation_steps: 4
     gradient_checkpointing: True
     gradient_checkpointing_kwargs:
       use_reentrant: False
     logging_strategy: "steps"
     logging_steps: 5
+    evaluation_strategy: "steps"
+    eval_steps: 100
   other:
     freeze_embed: True
     n_freeze: 24
