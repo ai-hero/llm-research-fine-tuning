@@ -1,5 +1,5 @@
 project:
-  name: "llmos"
+  name: "mmlu"
 
 dataset:
   type: "s3"
