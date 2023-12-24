@@ -4,7 +4,6 @@ from random import random
 from typing import Any, Generator, Tuple
 
 import torch
-import yaml  # type: ignore
 from datasets import Dataset, load_dataset, load_from_disk
 from fire import Fire
 from huggingface_hub import HfApi, login
@@ -14,7 +13,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
-from utils import DatasetMover, load_config, peft_module_casting_to_bf16, dump_envs
+
+from utils import DatasetMover, dump_envs, load_config, peft_module_casting_to_bf16
 
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
@@ -305,7 +305,7 @@ def train(
 
     # SFT training config
     sft_config = TrainingArguments(output_dir=CHECKPOINT_DIR, **config["training"]["sft"])
-    
+
     # PEFT training config
     if "peft" in config["training"]:
         peft_config = LoraConfig(**config["training"]["peft"])
@@ -347,7 +347,7 @@ def train(
 
     trainer.train()
 
-    # distributed training config 
+    # distributed training config
     if trainer.is_fsdp_enabled:
         trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
 
@@ -376,7 +376,8 @@ def upload_model(config: dict[str, Any]) -> None:
         raise NotImplementedError("S3 support not implemented yet")
 
 
-def main():
+def main() -> None:
+    """Execute the main training loop."""
     dump_envs()
     config = load_config()
     print("Loading dataset")

@@ -58,7 +58,7 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml", distribu
         with open(os.path.join(os.path.dirname(__file__), "distributed", distributed_config_file)) as f:
             distributed_training_config = yaml.safe_load(f)
             num_gpu = distributed_training_config["num_processes"]
-    
+
     dataset_name = training_config["dataset"]["name"]
     project_name = training_config["project"]["name"]
     wandb_tags = f"{os.getenv('USER',os.getenv('USERNAME'))},{job_name},{dataset_name}"

@@ -5,7 +5,7 @@ downcast_bf16: 'no'
 fsdp_config:
   fsdp_auto_wrap_policy: TRANSFORMER_BASED_WRAP # Autowrap policy https://pytorch.org/docs/stable/fsdp.html#module-torch.distributed.fsdp
   fsdp_backward_prefetch_policy: BACKWARD_PRE  # pytorch explicit param https://pytorch.org/docs/stable/fsdp.html#module-torch.distributed.fsdp
-  fsdp_cpu_ram_efficient_loading: true 
+  fsdp_cpu_ram_efficient_loading: true
   fsdp_forward_prefetch: false # pytorch explicit param https://pytorch.org/docs/stable/fsdp.html#module-torch.distributed.fsdp
   fsdp_offload_params: false # https://pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.CPUOffload
   fsdp_sharding_strategy: 2 # https://pytorch.org/docs/stable/fsdp.html#torch.distributed.fsdp.ShardingStrategy

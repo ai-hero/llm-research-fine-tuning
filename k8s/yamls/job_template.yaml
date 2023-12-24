@@ -24,7 +24,7 @@ spec:
             {% else %}
             nvidia.com/gpu: 1
             {% endif %}
-        imagePullPolicy: Always    
+        imagePullPolicy: Always
         command:
         - bash
         - "-c"

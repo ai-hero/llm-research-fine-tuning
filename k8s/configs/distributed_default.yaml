@@ -1,7 +1,7 @@
 project:
   name: "fine_tune_research"
-  
-dataset:  
+
+dataset:
   type: "hf"
   name: "sadmoseby/sample-function-call"
   format: "text"
