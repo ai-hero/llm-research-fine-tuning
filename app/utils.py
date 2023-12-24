@@ -3,7 +3,7 @@ import os
 import tarfile
 
 import torch
-import yaml
+import yaml  # type: ignore
 from minio import Minio, S3Error
 from peft.tuners.lora import LoraLayer
 from transformers import AutoModelForCausalLM
