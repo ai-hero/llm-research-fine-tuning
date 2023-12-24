@@ -6,3 +6,4 @@ metadata:
     project: {{project_name}}
 data:
   config.yaml: ""
+  distributed.yaml: ""

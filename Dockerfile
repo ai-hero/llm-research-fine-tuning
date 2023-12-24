@@ -33,4 +33,4 @@ WORKDIR /app
 # EXPOSE 80
 
 # Run peft.py when the container launches
-CMD ["python", "app.py"]
+CMD ["python", "sft.py"]

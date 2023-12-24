@@ -17,40 +17,40 @@ spec:
         image: {{ container_image }}
         resources:
           limits:
-            nvidia.com/gpu: 1
             memory: 32Gi
             cpu: 8
+            {% if num_gpu %}
+            nvidia.com/gpu: {{ num_gpu }}
+            {% else %}
+            nvidia.com/gpu: 1
+            {% endif %}
         imagePullPolicy: Always
         command:
         - bash
         - "-c"
-        {% if config_file %}
-        - "python sft.py --config_file=/mnt/config/training/config"
+        {% if num_gpu %}
+        - "accelerate launch --config_file /mnt/config/training/distributed.yaml sft.py"
         {% else %}
         - "python sft.py"
         {% endif %}
-        ## OR
-        # - bash
-        # - "-c"
-        # - "sleep 3600"
         env:
         {% if hf_token %}
         - name: HF_TOKEN
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: hf_token
         {% endif %}
         {% if wandb_api_key %}
         - name: WANDB_API_KEY
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: wandb_api_key
         - name: WANDB_USERNAME
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: wandb_username
         - name: WANDB_PROJECT
           value: {{project_name}}
@@ -61,34 +61,34 @@ spec:
         - name: WANDB_MODE
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: wandb_mode
         {% endif %}
         {% if s3_endpoint %}
         - name: S3_ENDPOINT
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: s3_endpoint
         - name: S3_ACCESS_KEY_ID
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: s3_access_key_id
         - name: S3_SECRET_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: s3_secret_access_key
         - name: S3_REGION
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: s3_region
         - name: S3_SECURE
           valueFrom:
             secretKeyRef:
-              name: secrets
+              name: {{job_name}}
               key: s3_secure
         {% endif %}
 
