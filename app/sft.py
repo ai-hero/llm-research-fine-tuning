@@ -22,7 +22,12 @@ MAX_NEW_TOKENS = 512
 
 
 def training_generator(
-    dataset: str, split: str = "train", from_disk: bool = False, format: str = "text"
+    dataset: str,
+    split: str = "train",
+    from_disk: bool = False,
+    format: str = "text",
+    bos_token: str = "<s>",
+    eos_token: str = "</s>",
 ) -> Generator[dict[str, Any], dict[str, Any], None]:
     """Generate training data by yielding each row in the dataset split."""
     # We assume that the dataset is a HuggingFace dataset, and a DatasetDict
@@ -37,11 +42,15 @@ def training_generator(
 
     for row in iter(ds):
         if format == "text":
-            text = row["text"]
+            text = f"{row['text']}"
+            if not text.startswith(bos_token):
+                text = f"{bos_token}{text}{eos_token}"
             yield {"text": text}
         elif format == "completion":
             # If the dataset is a 'completion' format dataset, we need to concatenate the prompt and completion
-            text = row["prompt"] + "\n" + row["completion"]
+            text = f"{row['prompt']}{row['completion']}"
+            if not text.startswith(bos_token):
+                text = f"{bos_token}{text}{eos_token}"
             yield {
                 "text": text,
                 "prompt": row["prompt"],
@@ -51,7 +60,7 @@ def training_generator(
             raise Exception(f"Unknown format: {format}")
 
 
-def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
+def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tuple[Dataset, Dataset, Dataset]:
     """Fetch the dataset from HuggingFace Hub or S3."""
     if config["dataset"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
@@ -62,6 +71,8 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                 "dataset": config["dataset"]["name"],
                 "split": "train",
                 "format": config["dataset"].get("format", "text"),
+                "bos_token": bos_token,
+                "eos_token": eos_token,
             },
         )
         try:
@@ -71,6 +82,8 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                     "dataset": config["dataset"]["name"],
                     "split": "val",
                     "format": config["dataset"].get("format", "text"),
+                    "bos_token": bos_token,
+                    "eos_token": eos_token,
                 },
             )
         except:  # pylint: disable=bare-except  # noqa: E722
@@ -83,6 +96,8 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                     "dataset": config["dataset"]["name"],
                     "split": "test",
                     "format": config["dataset"].get("format", "text"),
+                    "bos_token": bos_token,
+                    "eos_token": eos_token,
                 },
             )
         except:  # pylint: disable=bare-except  # noqa: E722
@@ -106,6 +121,8 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                 "split": "train",
                 "from_disk": True,
                 "format": config["dataset"].get("format", "text"),
+                "bos_token": bos_token,
+                "eos_token": eos_token,
             },
         )
         try:
@@ -116,6 +133,8 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                     "split": "val",
                     "from_disk": True,
                     "format": config["dataset"].get("format", "text"),
+                    "bos_token": bos_token,
+                    "eos_token": eos_token,
                 },
             )
         except:  # pylint: disable=bare-except  # noqa: E722
@@ -129,6 +148,8 @@ def fetch_dataset(config: dict[str, Any]) -> Tuple[Dataset, Dataset, Dataset]:
                     "split": "test",
                     "from_disk": True,
                     "format": config["dataset"].get("format", "text"),
+                    "bos_token": bos_token,
+                    "eos_token": eos_token,
                 },
             )
         except:  # pylint: disable=bare-except  # noqa: E722
@@ -188,6 +209,12 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
                 trust_remote_code=True,
             )
         tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
+        # May need to have some custom padding logic here
+        tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+        tokenizer.padding_side = "right"
+        model.config.pad_token_id = tokenizer.pad_token_id
+        model.resize_token_embeddings(len(tokenizer))
+
     elif config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
@@ -253,7 +280,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
     def generate(self: "LLMSampleCB", prompt: str) -> Any:
         """Generate a completion from a prompt."""
-        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt")["input_ids"].cuda()
+        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
         with torch.inference_mode():
             output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
         return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
@@ -263,6 +290,8 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         records_table = Table(columns=["prompt", "predicted", "actual"] + list(self.gen_config.to_dict().keys()))
         for example in tqdm(examples, leave=False):
             prompt = example["prompt"]
+            if not prompt.startswith(self.tokenizer.bos_token):
+                prompt = f"{self.tokenizer.bos_token}{prompt}"
             actual = example["completion"]
             predicted = self.generate(prompt=prompt)
             records_table.add_data(prompt, predicted, actual, *list(self.gen_config.to_dict().values()))
@@ -286,10 +315,6 @@ def train(
     """Start training the model as defined by the config."""
     # Assumes model is a causal language model
     model.config.use_cache = False
-
-    # May need to have some custom padding logic here
-    tokenizer.pad_token = tokenizer.eos_token
-    tokenizer.padding_side = "right"
 
     # Calculate max steps from num epochs
     if "num_train_epochs" in config["training"]["sft"]:
@@ -379,10 +404,12 @@ def main() -> None:
     """Execute the main training loop."""
     dump_envs()
     config = load_config()
-    print("Loading dataset")
-    train_split, val_split, test_split = fetch_dataset(config)
     print("Loading model")
     model, tokenizer = load_model(config)
+    print("Loading dataset")
+    train_split, val_split, test_split = fetch_dataset(
+        config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token
+    )
     print("Starting training")
     train(
         train_split=train_split,

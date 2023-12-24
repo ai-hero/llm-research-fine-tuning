@@ -1,9 +1,9 @@
 project:
-  name: "llmos"
+  name: "mmlu"
 
 dataset:
   type: "s3"
-  name: "fine-tuning-research/llmos"
+  name: "fine-tuning-research/mmlu"
   format: "completion"
 
 model:
@@ -12,7 +12,7 @@ model:
     name: "meta-llama/Llama-2-7b-hf"
   output:
     type: "hf"
-    name: "rparundekar/llama2-7b-llmos"
+    name: "rparundekar/llama2-7b-mmlu"
 
 training:
   trainer:
@@ -21,7 +21,7 @@ training:
   sft:
     per_device_train_batch_size: 24
     per_device_eval_batch_size: 24
-    fp16: False
+    fp16: True
     learning_rate: 0.0002
     lr_scheduler_type: "cosine"
     warmup_ratio: 0.1
@@ -34,6 +34,15 @@ training:
     logging_steps: 5
     evaluation_strategy: "steps"
     eval_steps: 100
-  other:
-    freeze_embed: True
-    n_freeze: 24
+  peft:
+    r: 64  # the rank of the LoRA matrices
+    lora_alpha: 16 # the weight
+    lora_dropout: 0.1 # dropout to add to the LoRA layers
+    bias: "none" # add bias to the nn.Linear layers?
+    task_type: "CAUSAL_LM"
+    target_modules:  # the name of the layers to add LoRA
+      - "q_proj"
+      - "k_proj"
+      - "v_proj"
+      - "o_proj"
+    quantized: True
