@@ -2,7 +2,14 @@
 import os
 import tarfile
 
+import torch
+import yaml
 from minio import Minio, S3Error
+from peft.tuners.lora import LoraLayer
+from transformers import AutoModelForCausalLM
+
+DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
+MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
 
 
 class DatasetMover:
@@ -65,3 +72,38 @@ class DatasetMover:
         self._download_from_s3(bucket_name, object_name, temp_filename)
         self._decompress_folder(temp_filename, output_folder_path)
         os.remove(temp_filename)  # Clean up the temporary compressed file
+
+
+def load_config() -> dict[str, str]:
+    """Load the application configuration."""
+    config: dict[str, str] = {}
+    if os.path.exists(MOUNTED_CONFIG_PATH):
+        config_file = MOUNTED_CONFIG_PATH
+        print("Loading mounted config")
+    else:
+        config_file = DEFAULT_STATIC_CONFIG_PATH
+        print("Loading default config")
+    with open(file=config_file, encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    return config
+
+
+def peft_module_casting_to_bf16(model: AutoModelForCausalLM, args: dict[str, str]) -> None:
+    """Cast the PEFT model to bf16."""
+    for name, module in model.named_modules():
+        if isinstance(module, LoraLayer):
+            if args["bf16"]:
+                module = module.to(torch.bfloat16)
+        if "norm" in name:
+            module = module.to(torch.float32)
+        if any(x in name for x in ["lm_head", "embed_tokens", "wte", "wpe"]):
+            if hasattr(module, "weight"):
+                if args["bf16"] and module.weight.dtype == torch.float32:
+                    module = module.to(torch.bfloat16)
+
+
+def dump_envs() -> None:
+    """Dump the application relevant environment variables."""
+    print("Training LOCAL RANK: {} ...".format(os.getenv("LOCAL_RANK", "Unknown")))
+    print("Training RANK: {} ...".format(os.getenv("RANK", "Unknown")))
+    print("Training LOCAL WORLD SIZE: {} ...".format(os.getenv("LOCAL_WORLD_SIZE", "Unknown")))

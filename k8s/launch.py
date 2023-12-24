@@ -23,10 +23,11 @@ def b64encode_filter(s: str) -> str:
     return None
 
 
-def train(container_image: str, config_file: str = "guanaco_peft.yaml") -> None:
+def train(container_image: str, config_file: str = "guanaco_peft.yaml", distributed_config_file: str = "") -> None:
     """Launch a Kubernetes job for training a model."""
     job_name = codenamize(f"{config_file}-{time.time()}")
     print(f"Job name: {job_name}")
+    num_gpu = ""
 
     # Get variables
     assert container_image, "You need to provide container_image"
@@ -53,6 +54,11 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml") -> None:
     # Load training config file and extract dataset name
     with open(os.path.join(os.path.dirname(__file__), "configs", config_file)) as f:
         training_config = yaml.safe_load(f)
+    if distributed_config_file:
+        with open(os.path.join(os.path.dirname(__file__), "distributed", distributed_config_file)) as f:
+            distributed_training_config = yaml.safe_load(f)
+            num_gpu = distributed_training_config["num_processes"]
+
     dataset_name = training_config["dataset"]["name"]
     project_name = training_config["project"]["name"]
     wandb_tags = f"{os.getenv('USER',os.getenv('USERNAME'))},{job_name},{dataset_name}"
@@ -77,11 +83,14 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml") -> None:
             wandb_job_name=job_name,
             wandb_tags=wandb_tags,
             config_file=config_file,
+            num_gpu=num_gpu,
         )
         if "config_template.yaml" == yaml_file.split("/")[-1]:
             # Set the training config as the string value for config map
             config = yaml.safe_load(rendered_template)
             config["data"]["config.yaml"] = yaml.dump(training_config)
+            if num_gpu:
+                config["data"]["distributed.yaml"] = yaml.dump(distributed_training_config)
             rendered_template = yaml.dump(config)
 
         # Use subprocess.Popen with communicate to apply the Kubernetes configuration
@@ -113,6 +122,11 @@ def delete(job_name: str) -> None:
     with subprocess.Popen(["kubectl", "delete", "configmap", job_name], stdin=subprocess.PIPE, text=True) as proc:
         proc.communicate()
     print(f"Deleted Kubernetes configmap {job_name}")
+
+    # Use subprocess.Popen with communicate to delete the Kubernetes job
+    with subprocess.Popen(["kubectl", "delete", "secret", job_name], stdin=subprocess.PIPE, text=True) as proc:
+        proc.communicate()
+    print(f"Deleted Kubernetes secret {job_name}")
 
 
 if __name__ == "__main__":

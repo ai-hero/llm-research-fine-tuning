@@ -1,7 +1,7 @@
 transformers==4.35.0
 peft==0.5.0
 bitsandbytes==0.41.1
-accelerate==0.22.0
+accelerate==0.25.0
 trl==0.7.2
 pydantic-settings==2.0.3
 scipy==1.11.3
