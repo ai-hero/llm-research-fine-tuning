@@ -318,14 +318,8 @@ def train(
 
     # Calculate max steps from num epochs
     if "num_train_epochs" in config["training"]["sft"]:
-        num_train_epochs = config["training"]["sft"].pop("num_train_epochs")
-        max_steps = (
-            num_train_epochs * train_split.num_rows // config["training"]["sft"]["per_device_train_batch_size"]
-        )  # TODO: Add num gpus when we do FSDP. need to fix this
-        config["training"]["sft"]["max_steps"] = max_steps
-        save_steps = max_steps // 8
-        config["training"]["sft"]["save_steps"] = save_steps
-        config["training"]["sft"]["save_strategy"] = "steps"
+        raise ValueError("num_train_epochs is not supported, use max_steps instead")
+    assert "max_steps" in config["training"]["sft"], "max_steps must be defined"
 
     # SFT training config
     sft_config = TrainingArguments(output_dir=CHECKPOINT_DIR, **config["training"]["sft"])
