@@ -23,7 +23,7 @@ def b64encode_filter(s: str) -> str:
     return None
 
 
-def train(container_image: str, config_file: str = "guanaco_peft.yaml", distributed_config_file: str = "") -> None:
+def launch(container_image: str, config_file: str = "guanaco_peft.yaml", distributed_config_file: str = "") -> None:
     """Launch a Kubernetes job for training a model."""
     job_name = codenamize(f"{config_file}-{time.time()}")
     print(f"Job name: {job_name}")
@@ -49,7 +49,7 @@ def train(container_image: str, config_file: str = "guanaco_peft.yaml", distribu
     env.filters["b64encode"] = b64encode_filter
 
     # Directory containing the YAML files
-    yaml_dir = os.path.join(os.path.dirname(__file__), "yamls")
+    yaml_dir = os.path.join(os.path.dirname(__file__), "yamls", "training")
 
     # Load training config file and extract dataset name
     with open(os.path.join(os.path.dirname(__file__), "configs", config_file)) as f:
@@ -132,7 +132,7 @@ def delete(job_name: str) -> None:
 if __name__ == "__main__":
     Fire(
         {
-            "train": train,
+            "launch": launch,
             "delete": delete,
         }
     )

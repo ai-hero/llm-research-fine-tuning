@@ -1,0 +1,63 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{model_name}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      model: {{model_name}}  # Using model_name as a label for selection.
+  template:
+    metadata:
+      labels:
+        model: {{model_name}}  # Labeling the pods with model_name.
+    spec:
+      containers:
+        - name: text-generation-inference
+          image: ghcr.io/huggingface/text-generation-inference:0.8.2
+          env:
+            {% if hf_token %}
+            - name: HUGGING_FACE_HUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{model_name}}
+                  key: hf_token
+            {% endif %}
+          command:
+            - "text-generation-launcher"
+            - "--model-id"
+            - "{{model_repo}}/{{model_name}}"
+          ports:
+            - containerPort: 80
+              name: http
+          volumeMounts:
+            - name: shm
+              mountPath: /dev/shm
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: gpu.nvidia.com/class
+                operator: In
+                values:
+                  - A100_PCIE_40GB
+      volumes:
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: text-generation-inference
+spec:
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  selector:
+    model: {{model_name}}  # Matching the label with model_name.
+  type: ClusterIP

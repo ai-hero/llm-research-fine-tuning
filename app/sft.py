@@ -379,8 +379,11 @@ def train(
 def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
     """Save the model to a local directory."""
     print("Saving model and tokenizer")
-    model.save_pretrained(config["model"]["output"]["name"])
-    tokenizer.save_pretrained(config["model"]["output"]["name"])
+    local_name = config["model"]["output"]["name"].split("/")[-1]
+    model.save_pretrained(local_name)
+    tokenizer.save_pretrained(local_name)
+    print(os.listdir(local_name))
+
     """Upload the model to HuggingFace Hub or S3."""
     if os.getenv("RANK", "0") != "0":
         return
@@ -390,9 +393,8 @@ def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
         print("Saving model and tokenizer to hf")
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
-
-        model.push_to_hub(config["model"]["output"]["name"], use_temp_dir=False)
-        tokenizer.push_to_hub(config["model"]["output"]["name"], use_temp_dir=False)
+        model.push_to_hub(local_name)
+        tokenizer.push_to_hub(local_name)
     elif config["model"]["output"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
