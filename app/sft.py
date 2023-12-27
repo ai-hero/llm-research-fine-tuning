@@ -6,7 +6,7 @@ from typing import Any, Generator, Tuple
 import torch
 from datasets import Dataset, load_dataset, load_from_disk
 from fire import Fire
-from huggingface_hub import HfApi, login
+from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, GenerationConfig, TrainingArguments
@@ -376,27 +376,22 @@ def train(
 
 def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
     """Save the model to a local directory."""
-    print("Saving model and tokenizer")
-    model.save_pretrained(FINAL_DIR)
-    tokenizer.save_pretrained(FINAL_DIR)
-
     """Upload the model to HuggingFace Hub or S3."""
     if os.getenv("RANK", "0") != "0":
         return
     if "output" not in config["model"]:
         return
     if config["model"]["output"]["type"] == "hf":
+        print("Saving model and tokenizer to hf")
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
-        api = HfApi()
-        api.upload_folder(
-            folder_path=FINAL_DIR,
-            repo_id=config["model"]["output"]["name"],
-            repo_type="model",
-            token=os.environ["HF_TOKEN"],
-        )
+        model.push_to_hub(config["model"]["output"]["name"], use_temp_dir=False)
+        tokenizer.push_to_hub(config["model"]["output"]["name"], use_temp_dir=False)
     elif config["model"]["output"]["type"] == "s3":
         # TODO : Add s3 support
+        # print("Saving model and tokenizer")
+        # model.save_pretrained(FINAL_DIR)
+        # tokenizer.save_pretrained(FINAL_DIR)
         raise NotImplementedError("S3 support not implemented yet")
 
 
