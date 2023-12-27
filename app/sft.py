@@ -18,6 +18,7 @@ from utils import DatasetMover, dump_envs, load_config, peft_module_casting_to_b
 
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
+FINAL_DIR = "/mnt/final_model"
 MAX_NEW_TOKENS = 512
 
 
@@ -373,7 +374,12 @@ def train(
     #     trainer.evaluate(test_split)
 
 
-def upload_model(config: dict[str, Any]) -> None:
+def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
+    """Save the model to a local directory."""
+    print("Saving model and tokenizer")
+    model.save_pretrained(FINAL_DIR)
+    tokenizer.save_pretrained(FINAL_DIR)
+
     """Upload the model to HuggingFace Hub or S3."""
     if os.getenv("RANK", "0") != "0":
         return
@@ -384,7 +390,7 @@ def upload_model(config: dict[str, Any]) -> None:
             login(token=os.environ["HF_TOKEN"])
         api = HfApi()
         api.upload_folder(
-            folder_path=CHECKPOINT_DIR,
+            folder_path=FINAL_DIR,
             repo_id=config["model"]["output"]["name"],
             repo_type="model",
             token=os.environ["HF_TOKEN"],
@@ -413,8 +419,8 @@ def main() -> None:
         tokenizer=tokenizer,
         config=config,
     )
-    print("Uploading model..")
-    upload_model(config)
+    print("Save and Uploading model..")
+    save_model(model, tokenizer, config)
 
     finish()
 
