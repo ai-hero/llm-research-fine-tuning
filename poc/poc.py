@@ -19,7 +19,8 @@ def stream_response(prompt: str) -> Generator[str, str, str]:
 
 
 # Streamlit app interface
-st.title("AI Hero Fine Tune Research PoC")
+st.title("Fine Tune Research PoC")
+st.subheader("Powered by AI Hero.")
 
 # Text box for user input
 user_input = st.text_area("Enter your prompt:", "What is Deep Learning?")
