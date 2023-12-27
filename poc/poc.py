@@ -12,7 +12,7 @@ def stream_response(prompt: str) -> Generator[str, str, str]:
     """Stream the response from the TGI server."""
     try:
         # Stream tokens from the response and yield them
-        yield from client.text_generation(prompt, max_new_tokens=20, stream=True)
+        yield from client.text_generation(prompt, max_new_tokens=512, stream=True)
     except Exception as e:
         yield f"An error occurred: {e}"
     return ""
