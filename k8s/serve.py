@@ -21,7 +21,7 @@ def b64encode_filter(s: str) -> str:
     return None
 
 
-def serve(config_file: str = "guanaco_peft.yaml") -> None:
+def launch(config_file: str = "mmlu_peft.yaml") -> None:
     """Launch a Kubernetes service for serving the model."""
     hf_token = os.getenv("HF_TOKEN", "")
     s3_endpoint = os.getenv("S3_ENDPOINT", "")
@@ -40,16 +40,16 @@ def serve(config_file: str = "guanaco_peft.yaml") -> None:
     env.filters["b64encode"] = b64encode_filter
 
     # Directory containing the YAML files
-    yaml_dir = os.path.join(os.path.dirname(__file__), "yamls", "training")
+    yaml_dir = os.path.join(os.path.dirname(__file__), "yamls", "serving")
 
     # Load training config file and extract dataset name
     with open(os.path.join(os.path.dirname(__file__), "configs", config_file)) as f:
         training_config = yaml.safe_load(f)
 
-    model_name = training_config["base"]["name"]
-    assert training_config["base"]["type"] == "hf", "Only hf models are supported for serving"
-    model_repo = model_name.split("/")[0]
-    model_name = model_name.split("/")[-1]
+    assert training_config["model"]["output"]["type"] == "hf", "Only hf models are supported for serving"
+    model_name = training_config["model"]["output"]["name"]
+    app_name = model_name.split("/")[-1].lower()
+    project_name = training_config["project"]["name"]
 
     # Iterate through all yaml files in the 'yamls' directory
     for yaml_file in glob.glob(os.path.join(yaml_dir, "*.yaml")):
@@ -57,7 +57,8 @@ def serve(config_file: str = "guanaco_peft.yaml") -> None:
         template = env.get_template(os.path.relpath(yaml_file))
         # Render the template with environment variables
         rendered_template = template.render(
-            model_repo=model_repo,
+            project_name=project_name,
+            app_name=app_name,
             model_name=model_name,
             s3_endpoint=s3_endpoint,
             s3_access_key_id=s3_access_key_id,
@@ -79,33 +80,34 @@ def serve(config_file: str = "guanaco_peft.yaml") -> None:
 
     print(f"Applied Kubernetes configuration from {yaml_file}")
 
-    print(f"Launched service name: {model_name}")
-    print(f"1. To see status, run: kubectl describe service/{model_name}")
-    print(f"2. To see logs, run: kubectl logs service/{model_name} -f")
-    print(f"3. To delete job and other artifacts, run: python serve.py delete {model_name}")
+    print(f"Launched service name: {app_name}")
+    print(f"1. To see status, run: kubectl describe deployment/{app_name}")
+    print(f"2. To see logs, run: kubectl logs deployment/{app_name} -f")
+    print(f"3. To port forward, run: kubectl port-forward deployment/{app_name} 8080:80")
+    print(f"4. To delete job and other artifacts, run: python serve.py delete {app_name}")
 
 
-def delete(model_name: str) -> None:
+def delete(app_name: str) -> None:
     """Delete a Kubernetes job and other artifacts."""
-    assert model_name, "You need to provide model_name"
+    assert app_name, "You need to provide app_name"
     # Use subprocess.Popen with communicate to delete the Kubernetes job
-    with subprocess.Popen(["kubectl", "delete", "deployment", model_name], stdin=subprocess.PIPE, text=True) as proc:
+    with subprocess.Popen(["kubectl", "delete", "deployment", app_name], stdin=subprocess.PIPE, text=True) as proc:
         proc.communicate()
-    print(f"Deleted Kubernetes deployment {model_name}")
-    with subprocess.Popen(["kubectl", "delete", "service", model_name], stdin=subprocess.PIPE, text=True) as proc:
+    print(f"Deleted Kubernetes deployment {app_name}")
+    with subprocess.Popen(["kubectl", "delete", "service", app_name], stdin=subprocess.PIPE, text=True) as proc:
         proc.communicate()
-    print(f"Deleted Kubernetes service {model_name}")
+    print(f"Deleted Kubernetes service {app_name}")
 
     # Use subprocess.Popen with communicate to delete the Kubernetes job
-    with subprocess.Popen(["kubectl", "delete", "secret", model_name], stdin=subprocess.PIPE, text=True) as proc:
+    with subprocess.Popen(["kubectl", "delete", "secret", app_name], stdin=subprocess.PIPE, text=True) as proc:
         proc.communicate()
-    print(f"Deleted Kubernetes secret {model_name}")
+    print(f"Deleted Kubernetes secret {app_name}")
 
 
 if __name__ == "__main__":
     Fire(
         {
-            "serve": serve,
+            "launch": launch,
             "delete": delete,
         }
     )

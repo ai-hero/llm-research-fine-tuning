@@ -1,36 +1,133 @@
+# apiVersion: serving.knative.dev/v1
+# kind: Service
+# metadata:
+#   name: {{app_name}}
+#   annotations:
+#     networking.knative.dev/ingress-class: kourier.ingress.networking.knative.dev
+#   labels:
+#     project: {{project_name}}
+#     knative.coreweave.cloud/ingress: kourier.ingress.networking.knative.dev
+# spec:
+#   template:
+#     metadata:
+#       labels:
+#         app: {{app_name}}  # Labeling the service with app_name.
+#       annotations:
+#         # Define any necessary Knative-specific annotations here.
+#         autoscaling.knative.dev/minScale: "1"
+#         autoscaling.knative.dev/maxScale: "1"
+#     spec:
+#       affinity:
+#         nodeAffinity:
+#           requiredDuringSchedulingIgnoredDuringExecution:
+#             nodeSelectorTerms:
+#             - matchExpressions:
+#               - key: gpu.nvidia.com/class
+#                 operator: In
+#                 values:
+#                   - A100_PCIE_40GB
+#       containers:
+#         - name: text-generation-inference
+#           image: ghcr.io/huggingface/text-generation-inference:1.3.4-rocm
+#           resources:
+#             requests:
+#               memory: "32Gi"
+#               cpu: "8"
+#               nvidia.com/gpu: "1"
+#             limits:
+#               memory: "32Gi"
+#               cpu: "8"
+#               nvidia.com/gpu: "1"
+#           env:
+#             # Include conditional environment variables like hf_token as needed.
+#             {% if hf_token %}
+#             - name: HUGGING_FACE_HUB_TOKEN
+#               valueFrom:
+#                 secretKeyRef:
+#                   name: {{app_name}}
+#                   key: hf_token
+#             {% endif %}
+#           command:
+#             - "text-generation-launcher"
+#             - "--model-id"
+#             - "tiiuae/falcon-7b-instruct"
+#           ports:
+#             - protocol: TCP
+#               containerPort: 8080
+#           livenessProbe:
+#             httpGet:
+#               path: /
+#               port: 8080
+#             initialDelaySeconds: 30
+#             periodSeconds: 30
+#           readinessProbe:
+#             httpGet:
+#               path: /
+#               port: 8080
+#             initialDelaySeconds: 30
+#             periodSeconds: 30
+#           volumeMounts:
+#             - name: shm
+#               mountPath: /dev/shm
+#       volumes:
+#         - name: shm
+#           emptyDir:
+#             medium: Memory
+#             sizeLimit: "1Gi"
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{model_name}}
+  name: {{app_name}}
+  labels:
+    project: {{project_name}}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      model: {{model_name}}  # Using model_name as a label for selection.
+      app: {{app_name}}  # Using app_name as a label for selection.
   template:
     metadata:
       labels:
-        model: {{model_name}}  # Labeling the pods with model_name.
+        app: {{app_name}}  # Labeling the pods with app_name.
     spec:
       containers:
         - name: text-generation-inference
-          image: ghcr.io/huggingface/text-generation-inference:0.8.2
+          image: ghcr.io/huggingface/text-generation-inference:1.1.1
+          resources:
+            limits:
+              memory: 32Gi
+              cpu: 8
+              nvidia.com/gpu: 1
           env:
             {% if hf_token %}
             - name: HUGGING_FACE_HUB_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: {{model_name}}
+                  name: {{app_name}}
                   key: hf_token
             {% endif %}
           command:
             - "text-generation-launcher"
             - "--model-id"
-            - "{{model_repo}}/{{model_name}}"
+            - "{{model_name}}"
+            - "--num-shard"
+            - "1"
           ports:
-            - containerPort: 80
-              name: http
+            - protocol: TCP
+              containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 30
+            periodSeconds: 30
           volumeMounts:
             - name: shm
               mountPath: /dev/shm
@@ -52,12 +149,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: text-generation-inference
+  name: {{app_name}}
+  labels:
+    project: {{project_name}}
 spec:
   ports:
   - port: 80
     protocol: TCP
     targetPort: 80
   selector:
-    model: {{model_name}}  # Matching the label with model_name.
-  type: ClusterIP
+    model: {{app_name}}  # Matching the label with app_name.
+  type: LoadBalancer

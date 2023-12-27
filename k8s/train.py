@@ -23,7 +23,7 @@ def b64encode_filter(s: str) -> str:
     return None
 
 
-def launch(container_image: str, config_file: str = "guanaco_peft.yaml", distributed_config_file: str = "") -> None:
+def launch(container_image: str, config_file: str = "mmlu_peft.yaml", distributed_config_file: str = "") -> None:
     """Launch a Kubernetes job for training a model."""
     job_name = codenamize(f"{config_file}-{time.time()}")
     print(f"Job name: {job_name}")
