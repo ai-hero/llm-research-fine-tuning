@@ -12,18 +12,18 @@ Update [k8s/yamls/config.yaml](k8s/yamls/config.yaml).
 ## Launching k8s job
 ```sh
 cd k8s/
-python launch.py train rparundekar/fine_tune_research:20231209_01 alpaca_peft.yaml
+python train.py launch rparundekar/fine_tune_research:20231209_01 alpaca_peft.yaml
 ```
 You'll see the name of the job. If launching with a distributed config
 ```sh
 cd k8s/
-python launch.py train rparundekar/fine_tune_research:20231209_01 distributed_default.yaml -d fsdp_single_worker.yaml
+python train.py launch rparundekar/fine_tune_research:20231209_01 distributed_default.yaml -d fsdp_single_worker.yaml
 ```
 
 
 ## Deleting a job
 ```sh
-python launch.py delete <job-name>
+python train.py delete <job-name>
 ```
 
 ## Code QA

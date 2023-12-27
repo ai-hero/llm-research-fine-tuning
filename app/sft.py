@@ -6,7 +6,7 @@ from typing import Any, Generator, Tuple
 import torch
 from datasets import Dataset, load_dataset, load_from_disk
 from fire import Fire
-from huggingface_hub import HfApi, login
+from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, GenerationConfig, TrainingArguments
@@ -322,6 +322,9 @@ def train(
     assert "max_steps" in config["training"]["sft"], "max_steps must be defined"
 
     # SFT training config
+    config["training"]["sft"]["save_total_limit"] = 2
+    config["training"]["sft"]["save_strategy"] = "steps"
+    config["training"]["sft"]["load_best_model_at_end"] = True
     sft_config = TrainingArguments(output_dir=CHECKPOINT_DIR, **config["training"]["sft"])
 
     # PEFT training config
@@ -373,22 +376,25 @@ def train(
     #     trainer.evaluate(test_split)
 
 
-def upload_model(config: dict[str, Any]) -> None:
+def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
+    """Save the model to a local directory."""
+    print("Saving model and tokenizer")
+    local_name = config["model"]["output"]["name"].split("/")[-1]
+    model.save_pretrained(local_name)
+    tokenizer.save_pretrained(local_name)
+    print(os.listdir(local_name))
+
     """Upload the model to HuggingFace Hub or S3."""
     if os.getenv("RANK", "0") != "0":
         return
     if "output" not in config["model"]:
         return
     if config["model"]["output"]["type"] == "hf":
+        print("Saving model and tokenizer to hf")
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
-        api = HfApi()
-        api.upload_folder(
-            folder_path=CHECKPOINT_DIR,
-            repo_id=config["model"]["output"]["name"],
-            repo_type="model",
-            token=os.environ["HF_TOKEN"],
-        )
+        model.push_to_hub(local_name)
+        tokenizer.push_to_hub(local_name)
     elif config["model"]["output"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
@@ -413,8 +419,8 @@ def main() -> None:
         tokenizer=tokenizer,
         config=config,
     )
-    print("Uploading model..")
-    upload_model(config)
+    print("Save and Uploading model..")
+    save_model(model, tokenizer, config)
 
     finish()
 
