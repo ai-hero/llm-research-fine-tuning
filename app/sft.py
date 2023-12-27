@@ -18,7 +18,6 @@ from utils import DatasetMover, dump_envs, load_config, peft_module_casting_to_b
 
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
-FINAL_DIR = "/mnt/final_model"
 MAX_NEW_TOKENS = 512
 
 
@@ -379,6 +378,9 @@ def train(
 
 def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
     """Save the model to a local directory."""
+    print("Saving model and tokenizer")
+    model.save_pretrained(config["model"]["output"]["name"])
+    tokenizer.save_pretrained(config["model"]["output"]["name"])
     """Upload the model to HuggingFace Hub or S3."""
     if os.getenv("RANK", "0") != "0":
         return
@@ -388,13 +390,11 @@ def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
         print("Saving model and tokenizer to hf")
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
+
         model.push_to_hub(config["model"]["output"]["name"], use_temp_dir=False)
         tokenizer.push_to_hub(config["model"]["output"]["name"], use_temp_dir=False)
     elif config["model"]["output"]["type"] == "s3":
         # TODO : Add s3 support
-        # print("Saving model and tokenizer")
-        # model.save_pretrained(FINAL_DIR)
-        # tokenizer.save_pretrained(FINAL_DIR)
         raise NotImplementedError("S3 support not implemented yet")
 
 
