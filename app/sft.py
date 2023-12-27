@@ -323,6 +323,9 @@ def train(
     assert "max_steps" in config["training"]["sft"], "max_steps must be defined"
 
     # SFT training config
+    config["training"]["sft"]["save_total_limit"] = 2
+    config["training"]["sft"]["save_strategy"] = "steps"
+    config["training"]["sft"]["load_best_model_at_end"] = True
     sft_config = TrainingArguments(output_dir=CHECKPOINT_DIR, **config["training"]["sft"])
 
     # PEFT training config
