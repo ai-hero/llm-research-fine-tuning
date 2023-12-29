@@ -20,7 +20,7 @@ def stream_response(prompt: str) -> Generator[str, str, str]:
 
 # Streamlit app interface
 st.title("Fine Tune Research PoC")
-st.subheader("Powered by AI Hero.")
+st.markdown("**Powered by AI Hero.**")
 
 # Text box for user input
 user_input = st.text_area("Enter your prompt:", "What is Deep Learning?")
@@ -29,7 +29,7 @@ if not user_input.startswith("<s>"):
 
 st.text("Completion: ")
 # Placeholder for the output
-output_container = st.empty()
+output_container = st.markdown("")
 
 output_text = None
 if output_text is None:
@@ -47,4 +47,4 @@ if st.button("Send"):
         # Append the new word to the output text
         output_text += part  # Add space between words
         # Update the output container with the new output text
-        output_container.write(output_text)
+        output_container.write(f"```{output_text}```")
