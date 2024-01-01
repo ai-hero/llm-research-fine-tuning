@@ -1,4 +1,0 @@
-python-dotenv
-jinja2
-kubernetes
-codenamize
