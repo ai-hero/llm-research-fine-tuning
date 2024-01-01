@@ -2,6 +2,9 @@
 
 This repo contains the code that will be run inside the container. The container is built and pushed to the repo using Github actions (see below). You can launch the fine tuning job using the `llm-research-orchestration` project with the data created with the `llm-research-data` project.
 
+## Container
+Our latest container we use for training is `rparundekar/fine_tune_research:{SHORT_SHA_ON_MAIN}`. You can launch jobs using this tag with the `llm-research-orchestration` project.
+
 ## Setup
 ```sh
 pip install -r requirements.txt
