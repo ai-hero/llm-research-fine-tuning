@@ -306,7 +306,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             for output, tokenized_prompt in zip(outputs, tokenized_prompts["input_ids"])
         ]
 
-    def samples_table(self, examples: list[dict[str, Any]], batch_size: int = 8) -> Table:
+    def samples_table(self) -> Table:
         """Generate a table of predictions for visual inspection in batches."""
         records_table = Table(
             columns=["prompt", "predicted", "actual", "initial"]
@@ -332,7 +332,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
     def on_evaluate(self: "LLMSampleCB", args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
         """Log the sample predictions to WANDB on eval callback."""
         super().on_evaluate(args, state, control, **kwargs)
-        records_table = self.samples_table(self.sample_split)
+        records_table = self.samples_table()
         self._wandb.log({"sample_predictions": records_table})
 
 
