@@ -12,3 +12,10 @@ pip install -r requirements.txt
 
 ## Building Docker using Github Actions
 Change the Github actions in the `.github` folder and set the right environment variables in Github to auto build the container and push to the right repo.
+
+## Building a Docker Image Manually
+Use a tag versioning by date / user as needed. For example,
+```sh
+docker build . -t rparundekar/fine_tune_research:20230110_01
+docker push rparundekar/fine_tune_research:20230110_01
+```
