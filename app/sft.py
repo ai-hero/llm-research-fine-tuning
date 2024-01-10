@@ -274,7 +274,9 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         # Randomly select indices for the samples
         selected_indices = random.sample(range(test_split.num_rows), num_samples)
         # Retrieve the selected samples from the dataset
-        self.sample_split = [test_split[i] for i in selected_indices]
+        test_split_list = list(test_split)
+        self.sample_split = [test_split_list[i] for i in selected_indices]
+        print(self.sample_split)
 
         self.model, self.tokenizer = trainer.model, trainer.tokenizer
         self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
@@ -288,6 +290,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         # Initial predictions
         self.initial_predictions = []
         for batch in tqdm(self.data_loader, leave=False):
+            print("batch (first)", batch[0])
             prompts = [
                 f"{self.tokenizer.bos_token}{ex['prompt']}"
                 if not ex["prompt"].startswith(self.tokenizer.bos_token)
@@ -395,6 +398,7 @@ def train(
             test_split,
             num_samples=15,
             max_new_tokens=config["training"]["trainer"]["max_seq_length"],
+            batch_size=config["training"]["sft"].get("per_device_eval_batch_size", 4),
         )
         trainer.add_callback(wandb_callback)
 
