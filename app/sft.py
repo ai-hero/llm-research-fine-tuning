@@ -284,7 +284,6 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         self.initial_predictions = []
         for i in tqdm(range(0, len(self.sample_split), self.batch_size), leave=False):
             batch = self.sample_split[i : i + self.batch_size]
-            print("batch", batch)
             prompts = [
                 f"{self.tokenizer.bos_token}{ex['prompt']}"
                 if not ex["prompt"].startswith(self.tokenizer.bos_token)
@@ -385,7 +384,7 @@ def train(
             trainer,
             format,
             test_split,
-            num_samples=15,
+            num_samples=100,
             max_new_tokens=config["training"]["trainer"]["max_seq_length"],
             batch_size=config["training"]["sft"].get("per_device_eval_batch_size", 4),
         )
