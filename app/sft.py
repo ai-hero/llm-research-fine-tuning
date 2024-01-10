@@ -297,7 +297,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         """Generate completions for a batch of prompts."""
         tokenized_prompts = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to("cuda")
         with torch.inference_mode():
-            output = self.model.generate(**tokenized_prompts, **self.gen_config)
+            output = self.model.generate(inputs=tokenized_prompts, generation_config=self.gen_config)
         return [
             self.tokenizer.decode(output[i][len(tokenized_prompts["input_ids"][i]) :], skip_special_tokens=True)
             for i in range(len(prompts))
