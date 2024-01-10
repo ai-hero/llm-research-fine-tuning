@@ -1,14 +1,13 @@
 """Launch the training job inside a container."""
 import os
 import random
-from typing import Any, Generator, Tuple
+from typing import Any, Generator, List, Tuple
 
 import torch
 from datasets import Dataset, load_dataset, load_from_disk
 from fire import Fire
 from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, GenerationConfig, TrainingArguments
 from transformers.integrations import WandbCallback
@@ -268,6 +267,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         super().__init__()
         assert format == "completion", "Only completion format supported for now"
         self._log_model = log_model
+        self.batch_size = batch_size
 
         # Sample a few rows from the test split to generate a table of predictions
         # for visual inspection a.k.a. spot checking
@@ -276,21 +276,15 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         # Retrieve the selected samples from the dataset
         test_split_list = list(test_split)
         self.sample_split = [test_split_list[i] for i in selected_indices]
-        print(self.sample_split)
 
         self.model, self.tokenizer = trainer.model, trainer.tokenizer
         self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
-        # Create a DataLoader for batch processing
-        # Convert list of dictionaries to dictionary of lists
-        data = {key: [d[key] for d in self.sample_split] for key in self.sample_split[0]}
-        # Create a Hugging Face dataset from the dictionary
-        dataset = Dataset.from_dict(data)
-        self.data_loader = DataLoader(dataset, batch_size=batch_size)
 
         # Initial predictions
         self.initial_predictions = []
-        for batch in tqdm(self.data_loader, leave=False):
-            print("batch (first)", batch[0])
+        for i in tqdm(range(0, len(self.sample_split), self.batch_size), leave=False):
+            batch = self.sample_split[i : i + self.batch_size]
+            print("batch", batch)
             prompts = [
                 f"{self.tokenizer.bos_token}{ex['prompt']}"
                 if not ex["prompt"].startswith(self.tokenizer.bos_token)
@@ -299,23 +293,23 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             ]
             self.initial_predictions.extend(self.generate(prompts))
 
-    def generate(self, prompts: list[str]) -> list[str]:
+    def generate(self, prompts: List[str]) -> List[str]:
         """Generate completions for a batch of prompts."""
         tokenized_prompts = self.tokenizer(prompts, return_tensors="pt", padding=True, truncation=True).to("cuda")
         with torch.inference_mode():
-            outputs = self.model.generate(**tokenized_prompts, **self.gen_config)
+            output = self.model.generate(**tokenized_prompts, **self.gen_config)
         return [
-            self.tokenizer.decode(output[len(tokenized_prompt) :], skip_special_tokens=True)
-            for output, tokenized_prompt in zip(outputs, tokenized_prompts["input_ids"])
+            self.tokenizer.decode(output[i][len(tokenized_prompts["input_ids"][i]) :], skip_special_tokens=True)
+            for i in range(len(prompts))
         ]
 
     def samples_table(self) -> Table:
-        """Generate a table of predictions for visual inspection in batches."""
-        records_table = Table(
-            columns=["prompt", "predicted", "actual", "initial"]
-        )  # + list(self.gen_config.to_dict().keys())
+        """Generate a table of predictions for visual inspection, processing in batches."""
+        records_table = Table(columns=["prompt", "predicted", "actual", "initial"])
 
-        for batch in tqdm(self.data_loader, leave=False):
+        # Process in batches
+        for i in tqdm(range(0, len(self.sample_split), self.batch_size), leave=False):
+            batch = self.sample_split[i : i + self.batch_size]
             prompts = [
                 f"{self.tokenizer.bos_token}{ex['prompt']}"
                 if not ex["prompt"].startswith(self.tokenizer.bos_token)
@@ -326,9 +320,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             predicteds = self.generate(prompts)
 
             for prompt, predicted, actual, initial in zip(prompts, predicteds, actuals, self.initial_predictions):
-                records_table.add_data(
-                    prompt, predicted, actual, initial
-                )  # , *list(self.gen_config.to_dict().values())
+                records_table.add_data(prompt, predicted, actual, initial)
 
         return records_table
 
