@@ -1,6 +1,6 @@
 """Launch the training job inside a container."""
 import os
-from random import random
+import random
 from typing import Any, Generator, Tuple
 
 import torch
@@ -269,14 +269,22 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
         # Sample a few rows from the test split to generate a table of predictions
         # for visual inspection a.k.a. spot checking
-        self.sample_split = []
-        for row in test_split:
-            if random() <= (num_samples / test_split.num_rows):
-                self.sample_split.append(row)
-            if len(self.sample_split) >= num_samples:
-                break
+        # Randomly select indices for the samples
+        selected_indices = random.sample(range(test_split.num_rows), num_samples)
+        # Retrieve the selected samples from the dataset
+        test_split_list = list(test_split)
+        self.sample_split = [test_split_list[i] for i in selected_indices]
+
         self.model, self.tokenizer = trainer.model, trainer.tokenizer
         self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
+
+        self.initial_predictions = []
+        for example in tqdm(self.sample_split, leave=False):
+            prompt = example["prompt"]
+            if not prompt.startswith(self.tokenizer.bos_token):
+                prompt = f"{self.tokenizer.bos_token}{prompt}"
+            predicted = self.generate(prompt=prompt)
+            self.initial_predictions.append(predicted)
 
     def generate(self: "LLMSampleCB", prompt: str) -> Any:
         """Generate a completion from a prompt."""
@@ -285,22 +293,28 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
         return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
 
-    def samples_table(self: "LLMSampleCB", examples: list[dict[str, Any]]) -> Table:
+    def samples_table(self: "LLMSampleCB") -> Table:
         """Generate a table of predictions for visual inspection."""
-        records_table = Table(columns=["prompt", "predicted", "actual"] + list(self.gen_config.to_dict().keys()))
-        for example in tqdm(examples, leave=False):
+        records_table = Table(
+            columns=["prompt", "predicted", "actual", "initial"]
+        )  # + list(self.gen_config.to_dict().keys())
+        index = 0
+        for example in tqdm(self.sample_split, leave=False):
             prompt = example["prompt"]
             if not prompt.startswith(self.tokenizer.bos_token):
                 prompt = f"{self.tokenizer.bos_token}{prompt}"
             actual = example["completion"]
             predicted = self.generate(prompt=prompt)
-            records_table.add_data(prompt, predicted, actual, *list(self.gen_config.to_dict().values()))
+            records_table.add_data(
+                prompt, predicted, actual, self.initial_predictions[index]
+            )  # , *list(self.gen_config.to_dict().values())
+            index += 1
         return records_table
 
     def on_evaluate(self: "LLMSampleCB", args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
         """Log the sample predictions to WANDB on eval callback."""
         super().on_evaluate(args, state, control, **kwargs)
-        records_table = self.samples_table(self.sample_split)
+        records_table = self.samples_table()
         self._wandb.log({"sample_predictions": records_table})
 
 
