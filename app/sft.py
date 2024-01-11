@@ -375,7 +375,7 @@ def train(
             trainer,
             format,
             test_split,
-            num_samples=15,
+            num_samples=100,
             max_new_tokens=config["training"]["trainer"]["max_seq_length"],
         )
         trainer.add_callback(wandb_callback)
