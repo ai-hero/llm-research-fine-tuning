@@ -211,9 +211,9 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
         tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
         # May need to have some custom padding logic here
         special_tokens = {"pad_token": "[PAD]"}
-        if "additional_special_tokens" in config["tokenizer"]:
-            special_tokens["additional_special_tokens"] = config["tokenizer"]["additional_special_tokens"]
         tokenizer.add_special_tokens(special_tokens)
+        if "additional_tokens" in config["tokenizer"]:
+            tokenizer.add_tokens(config["tokenizer"]["additional_tokens"])
         tokenizer.padding_side = "right"
         model.config.pad_token_id = tokenizer.pad_token_id
         model.resize_token_embeddings(len(tokenizer))
