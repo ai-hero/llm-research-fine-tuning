@@ -212,7 +212,7 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
         # May need to have some custom padding logic here
         special_tokens = {"pad_token": "[PAD]"}
         tokenizer.add_special_tokens(special_tokens)
-        if "additional_tokens" in config["tokenizer"]:
+        if "additional_tokens" in config.get("tokenizer", {}):
             tokenizer.add_tokens(config["tokenizer"]["additional_tokens"])
         tokenizer.padding_side = "right"
         model.config.pad_token_id = tokenizer.pad_token_id
