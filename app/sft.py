@@ -295,6 +295,14 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
         self.run_tests_str = run_tests_str
         self.run_metrics_str = run_metrics_str
+        # Generate the table of sample predictions
+        records_table, metrics = self.samples_table_and_metrics()
+
+        # Log the table of sample predictions to W&B
+        self._wandb.log({"sample_predictions": records_table})
+
+        # Log the calculated metrics to W&B
+        self._wandb.log(metrics)
         print("LLMSampleCB initialized")
 
     def generate(self: "LLMSampleCB", prompt: str) -> Any:
@@ -331,8 +339,10 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
         # Update records_table with the predictions, test results, and errors
         index = 0
+        passed = 0
         for example in tqdm(self.sample_split, leave=False):
             test_result = "PASS" if tests[index] else "FAIL"
+            passed += 1 if test_result == "PASS" else 0
             error_message = errors[index] if index < len(errors) else ""
             records_table.add_data(
                 example["prompt"],
@@ -355,7 +365,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             )
         else:
             metrics = {"custom_metrics": "N/A"}
-
+        metrics["passed"] = passed / len(rows)
         return records_table, metrics
 
     def on_evaluate(self, args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
