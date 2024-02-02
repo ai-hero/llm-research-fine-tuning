@@ -367,7 +367,8 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             )
             index += 1
 
-        metrics["passed"] = passed / len(rows)
+        metrics["passed"] = passed * 100 / len(rows)
+        print("Metrics:", metrics)
 
         return records_table, metrics
 
