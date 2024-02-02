@@ -330,9 +330,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
                 return ["N/A"] * len(prompts), ["N/A"] * len(prompts)
 
             exec(self.run_tests_str, globals())
-            tests, errors = run_tests(
-                [row["prompt"] for row in rows], [row["prediction"] for row in rows]
-            )  # noqa: F821
+            tests, errors = run_tests([row["prompt"] for row in rows], [row["predicted"] for row in rows])  # noqa: F821
         else:
             tests, errors = ["N/A"] * len(rows), ["N/A"] * len(rows)
 
