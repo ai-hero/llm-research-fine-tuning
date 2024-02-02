@@ -295,6 +295,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
         self.run_tests_str = run_tests_str
         self.run_metrics_str = run_metrics_str
+        print("LLMSampleCB initialized")
 
     def generate(self: "LLMSampleCB", prompt: str) -> Any:
         """Generate a completion from a prompt."""
@@ -435,6 +436,7 @@ def train(
         )
         trainer.add_callback(wandb_callback)
 
+    print("Starting training")
     trainer.train()
 
     # distributed training config
