@@ -346,7 +346,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
             exec(self.run_metrics_str, globals(), local_namespace)
-            run_metrics = local_namespace["get_metrics"]
+            run_metrics = local_namespace["run_metrics"]
             metrics = run_metrics(
                 [row["prompt"] for row in rows],
                 [json.dumps(row["actual"]) for row in rows],
