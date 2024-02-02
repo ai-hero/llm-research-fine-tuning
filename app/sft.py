@@ -318,7 +318,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         local_namespace: dict[str, Any] = {}
         # Assuming run_tests_str and run_metrics_str contain your testing and metrics code respectively
 
-        if self.run_tests_str and os.environ.get("EXECUTE_TESTS", "false").lower() == "true":
+        if self.run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
             # Execute dynamic code for tests
             exec(self.run_tests_str, globals(), local_namespace)
             test_completions = local_namespace["test_completions"]
@@ -341,7 +341,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             )
             index += 1
 
-        if self.run_metrics_str and os.environ.get("EXECUTE_METRICS", "false").lower() == "true":
+        if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
             exec(self.run_metrics_str, globals(), local_namespace)
             get_metrics = local_namespace["get_metrics"]
