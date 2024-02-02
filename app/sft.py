@@ -9,7 +9,7 @@ from fire import Fire
 from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainingArguments
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, GenerationConfig, TrainingArguments
 from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
@@ -271,7 +271,9 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         super().__init__()
         assert format == "completion", "Only completion format supported for now"
         self._log_model = log_model
-        self.trainer = trainer
+        self.model, self.tokenizer = trainer.model, trainer.tokenizer
+        self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
+
         # Sample a few rows from the test split to generate a table of predictions
         # for visual inspection a.k.a. spot checking
         # Randomly select indices for the samples
@@ -288,8 +290,22 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
     def initialize(self: "LLMSampleCB") -> None:
         """Generate initial predictions for the sample split and log them to WANDB."""
+        # Test the provided code if present:
+        test_rows = []
+        for example in tqdm(self.sample_split, leave=False):
+            prompt = example["prompt"]
+            actual = example["completion"]
+            test_rows.append({"prompt": prompt, "actual": actual, "predicted": actual, "initial": actual})
+        self.execute_custom_code(test_rows)
+
         print("Generating initial predictions for sample split")
-        self.initial_predictions, _, _ = self.trainer.predict(self.sample_split)
+        self.initial_predictions = []
+        for example in tqdm(self.sample_split, leave=False):
+            prompt = example["prompt"]
+            if not prompt.startswith(self.tokenizer.bos_token):
+                prompt = f"{self.tokenizer.bos_token}{prompt}"
+            predicted = self.generate(prompt=prompt)
+            self.initial_predictions.append(predicted)
 
         # Generate the table of sample predictions
         records_table, metrics = self.samples_table_and_metrics()
@@ -301,22 +317,9 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         self._wandb.log(metrics)
         print("LLMSampleCB initialized")
 
-    def samples_table_and_metrics(self) -> Tuple[Table, dict[str, Any]]:
-        """Generate a table of predictions for visual inspection and evaluate them."""
+    def execute_custom_code(self, rows: list[dict[str, Any]]) -> Tuple[Table, dict[str, Any]]:
+        """Execute custom code for tests and metrics."""
         records_table = Table(columns=["prompt", "predicted", "actual", "initial", "test_result", "errors"])
-
-        print("Generating predictions for sample split")
-        current_predictions, _, _ = self.trainer.predict(self.sample_split)
-        # Generate rows of predictions
-        rows = []
-        for example, current, initial in tqdm(
-            zip(self.sample_split, current_predictions, self.initial_predictions), leave=False
-        ):
-            prompt = example["prompt"]
-            actual = example["completion"]
-            predicted = current
-            rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": initial})
-            print(f"Prompt: {prompt}\nActual: {actual}\nPredicted: {predicted}\nInitial: {initial}\n")
 
         # Prepare dynamic code execution
         class AutoImportDict(dict[str, Any]):
@@ -342,7 +345,18 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         else:
             tests, errors = ["N/A"] * len(rows), ["N/A"] * len(rows)
 
-        # Update records_table with the predictions, test results, and errors
+        if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
+            # Execute dynamic code for metrics
+            exec(self.run_metrics_str, global_namespace, local_namespace)
+            run_metrics = local_namespace["run_metrics"]
+            metrics = run_metrics(
+                [row["prompt"] for row in rows],
+                [row["actual"] for row in rows],
+                [row["predicted"] for row in rows],
+            )
+        else:
+            metrics = {}
+
         index = 0
         passed = 0
         for row in tqdm(rows, leave=False):
@@ -359,19 +373,33 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             )
             index += 1
 
-        if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
-            # Execute dynamic code for metrics
-            exec(self.run_metrics_str, global_namespace, local_namespace)
-            run_metrics = local_namespace["run_metrics"]
-            metrics = run_metrics(
-                [row["prompt"] for row in rows],
-                [row["actual"] for row in rows],
-                [row["predicted"] for row in rows],
-            )
-        else:
-            metrics = {"custom_metrics": "N/A"}
         metrics["passed"] = passed / len(rows)
+
         return records_table, metrics
+
+    def samples_table_and_metrics(self) -> Tuple[Table, dict[str, Any]]:
+        """Generate a table of predictions for visual inspection and evaluate them."""
+        print("Generating predictions for sample split")
+        current_predictions = []
+        for example in tqdm(self.sample_split, leave=False):
+            prompt = example["prompt"]
+            if not prompt.startswith(self.tokenizer.bos_token):
+                prompt = f"{self.tokenizer.bos_token}{prompt}"
+            predicted = self.generate(prompt=prompt)
+            current_predictions.append(predicted)
+
+        # Generate rows of predictions
+        rows = []
+        for example, current, initial in tqdm(
+            zip(self.sample_split, current_predictions, self.initial_predictions), leave=False
+        ):
+            prompt = example["prompt"]
+            actual = example["completion"]
+            predicted = current
+            rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": initial})
+            print(f"Prompt: {prompt}\nActual: {actual}\nPredicted: {predicted}\nInitial: {initial}\n")
+
+        return self.execute_custom_code(rows)
 
     def on_evaluate(self, args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
         """Log the sample predictions and metrics to WANDB on eval callback."""
