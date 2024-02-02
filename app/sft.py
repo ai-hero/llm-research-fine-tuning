@@ -9,7 +9,7 @@ from fire import Fire
 from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, GenerationConfig, TrainingArguments
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainingArguments
 from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
@@ -271,29 +271,26 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         super().__init__()
         assert format == "completion", "Only completion format supported for now"
         self._log_model = log_model
-
+        self.trainer = trainer
         # Sample a few rows from the test split to generate a table of predictions
         # for visual inspection a.k.a. spot checking
         # Randomly select indices for the samples
         selected_indices = random.sample(range(test_split.num_rows), num_samples)
         # Retrieve the selected samples from the dataset
         test_split_list = list(test_split)
-        self.sample_split = [test_split_list[i] for i in selected_indices]
-
-        self.model, self.tokenizer = trainer.model, trainer.tokenizer
-        self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
-
-        self.initial_predictions = []
-        print("Generating initial predictions for sample split")
-        for example in tqdm(self.sample_split, leave=False):
-            prompt = example["prompt"]
-            if not prompt.startswith(self.tokenizer.bos_token):
-                prompt = f"{self.tokenizer.bos_token}{prompt}"
-            predicted = self.generate(prompt=prompt)
-            self.initial_predictions.append(predicted)
+        self.sample_split = []
+        for i in selected_indices:
+            self.sample_split.append(test_split_list[i])
+        self.sample_split = Dataset.from_list(self.sample_split)
 
         self.run_tests_str = run_tests_str
         self.run_metrics_str = run_metrics_str
+
+    def initialize(self: "LLMSampleCB") -> None:
+        """Generate initial predictions for the sample split and log them to WANDB."""
+        print("Generating initial predictions for sample split")
+        self.initial_predictions, _, _ = self.trainer.predict(self.sample_split)
+
         # Generate the table of sample predictions
         records_table, metrics = self.samples_table_and_metrics()
 
@@ -304,25 +301,22 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         self._wandb.log(metrics)
         print("LLMSampleCB initialized")
 
-    def generate(self: "LLMSampleCB", prompt: str) -> Any:
-        """Generate a completion from a prompt."""
-        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
-        with torch.inference_mode():
-            output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
-        return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
-
     def samples_table_and_metrics(self) -> Tuple[Table, dict[str, Any]]:
         """Generate a table of predictions for visual inspection and evaluate them."""
         records_table = Table(columns=["prompt", "predicted", "actual", "initial", "test_result", "errors"])
 
         print("Generating predictions for sample split")
+        current_predictions, _, _ = self.trainer.predict(self.sample_split)
         # Generate rows of predictions
         rows = []
-        for example in tqdm(self.sample_split, leave=False):
+        for example, current, initial in tqdm(
+            zip(self.sample_split, current_predictions, self.initial_predictions), leave=False
+        ):
             prompt = example["prompt"]
             actual = example["completion"]
-            predicted = self.generate(prompt=prompt)  # Assuming self.generate is a method to generate predictions
-            rows.append({"prompt": prompt, "actual": actual, "prediction": predicted})
+            predicted = current
+            rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": initial})
+            print(f"Prompt: {prompt}\nActual: {actual}\nPredicted: {predicted}\nInitial: {initial}\n")
 
         # Prepare dynamic code execution
         class AutoImportDict(dict[str, Any]):
@@ -351,15 +345,15 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         # Update records_table with the predictions, test results, and errors
         index = 0
         passed = 0
-        for example in tqdm(self.sample_split, leave=False):
+        for row in tqdm(rows, leave=False):
             test_result = "PASS" if tests[index] else "FAIL"
             passed += 1 if test_result == "PASS" else 0
             error_message = errors[index] if index < len(errors) else ""
             records_table.add_data(
-                example["prompt"],
-                rows[index]["prediction"],
-                example["completion"],
-                self.initial_predictions[index],
+                row["prompt"],
+                row["predicted"],
+                row["actual"],
+                row["initial"],
                 test_result,
                 error_message,
             )
@@ -372,7 +366,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             metrics = run_metrics(
                 [row["prompt"] for row in rows],
                 [row["actual"] for row in rows],
-                [row["prediction"] for row in rows],
+                [row["predicted"] for row in rows],
             )
         else:
             metrics = {"custom_metrics": "N/A"}
@@ -455,6 +449,7 @@ def train(
             run_tests_str=config.get("tests", ""),
             run_metrics_str=config.get("metrics", ""),
         )
+        wandb_callback.initialize()
         trainer.add_callback(wandb_callback)
 
     print("Starting training")
