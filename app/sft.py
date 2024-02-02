@@ -325,12 +325,24 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             rows.append({"prompt": prompt, "actual": actual, "prediction": predicted})
 
         # Prepare dynamic code execution
-        local_namespace: dict[str, Any] = {}
+        class AutoImportDict(dict[str, Any]):
+            def __missing__(self, key: str) -> Any:
+                try:
+                    self[key] = __import__(key)
+                    return self[key]
+                except ImportError:
+                    raise ImportError(f"No module named '{key}'")
+
+        # Prepare the execution environment
+        local_namespace = AutoImportDict()
+        global_namespace = globals().copy()  # Or prepare a specific global namespace as needed
+
         # Assuming run_tests_str and run_metrics_str contain your testing and metrics code respectively
 
+        print("Updating records_table with predictions, test results, and errors")
         if self.run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
             # Execute dynamic code for tests
-            exec(self.run_tests_str, globals(), local_namespace)
+            exec(self.run_tests_str, global_namespace, local_namespace)
             run_tests = local_namespace["run_tests"]
             tests, errors = run_tests([row["prompt"] for row in rows], [row["prediction"] for row in rows])
         else:
@@ -355,7 +367,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
         if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
-            exec(self.run_metrics_str, globals(), local_namespace)
+            exec(self.run_metrics_str, global_namespace, local_namespace)
             run_metrics = local_namespace["run_metrics"]
             metrics = run_metrics(
                 [row["prompt"] for row in rows],
@@ -438,7 +450,7 @@ def train(
             trainer,
             format,
             test_split,
-            num_samples=100,
+            num_samples=10,
             max_new_tokens=config["training"]["trainer"]["max_seq_length"],
             run_tests_str=config.get("tests", ""),
             run_metrics_str=config.get("metrics", ""),
