@@ -321,34 +321,27 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         """Execute custom code for tests and metrics."""
         records_table = Table(columns=["prompt", "predicted", "actual", "initial", "test_result", "errors"])
 
-        # Prepare dynamic code execution
-        class AutoImportDict(dict[str, Any]):
-            def __missing__(self, key: str) -> Any:
-                try:
-                    self[key] = __import__(key)
-                    return self[key]
-                except ImportError:
-                    raise ImportError(f"No module named '{key}'")
-
-        # Prepare the execution environment
-        local_namespace = AutoImportDict()
-        global_namespace = globals().copy()  # Or prepare a specific global namespace as needed
-
         # Assuming run_tests_str and run_metrics_str contain your testing and metrics code respectively
 
         print("Updating records_table with predictions, test results, and errors")
         if self.run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
             # Execute dynamic code for tests
-            exec(self.run_tests_str, global_namespace, local_namespace)
-            run_tests = local_namespace["run_tests"]
-            tests, errors = run_tests([row["prompt"] for row in rows], [row["prediction"] for row in rows])
+            def run_tests(prompts: list[str], predictions: list[str]) -> Tuple[list[str], list[str]]:
+                return ["N/A"] * len(prompts), ["N/A"] * len(prompts)
+
+            exec(self.run_tests_str, globals())
+            tests, errors = run_tests(
+                [row["prompt"] for row in rows], [row["prediction"] for row in rows]
+            )  # noqa: F821
         else:
             tests, errors = ["N/A"] * len(rows), ["N/A"] * len(rows)
 
         if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
-            exec(self.run_metrics_str, global_namespace, local_namespace)
-            run_metrics = local_namespace["run_metrics"]
+            def run_metrics(prompts: list[str], actuals: list[str], predictions: list[str]) -> dict[str, float]:
+                return {}
+
+            exec(self.run_metrics_str, globals())
             metrics = run_metrics(
                 [row["prompt"] for row in rows],
                 [row["actual"] for row in rows],
