@@ -285,6 +285,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
 
         self.initial_predictions = []
+        print("Generating initial predictions for sample split")
         for example in tqdm(self.sample_split, leave=False):
             prompt = example["prompt"]
             if not prompt.startswith(self.tokenizer.bos_token):
@@ -306,6 +307,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         """Generate a table of predictions for visual inspection and evaluate them."""
         records_table = Table(columns=["prompt", "predicted", "actual", "initial", "test_result", "errors"])
 
+        print("Generating predictions for sample split")
         # Generate rows of predictions
         rows = []
         for example in tqdm(self.sample_split, leave=False):
@@ -321,8 +323,8 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         if self.run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
             # Execute dynamic code for tests
             exec(self.run_tests_str, globals(), local_namespace)
-            test_completions = local_namespace["test_completions"]
-            tests, errors = test_completions([row["prompt"] for row in rows], [row["prediction"] for row in rows])
+            run_tests = local_namespace["run_tests"]
+            tests, errors = run_tests([row["prompt"] for row in rows], [row["prediction"] for row in rows])
         else:
             tests, errors = ["N/A"] * len(rows), ["N/A"] * len(rows)
 
@@ -344,8 +346,8 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
             exec(self.run_metrics_str, globals(), local_namespace)
-            get_metrics = local_namespace["get_metrics"]
-            metrics = get_metrics(
+            run_metrics = local_namespace["get_metrics"]
+            metrics = run_metrics(
                 [row["prompt"] for row in rows],
                 [json.dumps(row["actual"]) for row in rows],
                 [row["prediction"] for row in rows],
