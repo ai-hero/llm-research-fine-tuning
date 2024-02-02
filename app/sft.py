@@ -526,7 +526,7 @@ def main() -> None:
     train_split, val_split, test_split = fetch_dataset(
         config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token
     )
-    if len(val_split > 10):
+    if len(val_split) > 10:
         val_split = val_split.select(range(10))
 
     print("Starting training")
