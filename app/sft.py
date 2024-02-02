@@ -478,7 +478,7 @@ def train(
             run_tests_str=config.get("tests", ""),
             run_metrics_str=config.get("metrics", ""),
         )
-        # wandb_callback.initialize()
+        wandb_callback.initialize()
         trainer.add_callback(wandb_callback)
 
     print("Starting training")
@@ -526,6 +526,9 @@ def main() -> None:
     train_split, val_split, test_split = fetch_dataset(
         config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token
     )
+    if len(val_split > 10):
+        val_split = val_split.select(range(10))
+
     print("Starting training")
     train(
         train_split=train_split,
