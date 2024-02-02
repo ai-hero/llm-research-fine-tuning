@@ -398,7 +398,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             actual = example["completion"]
             predicted = current
             rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": initial})
-            print(f"Prompt: {prompt}\nActual: {actual}\nPredicted: {predicted}\nInitial: {initial}\n")
+            # print(f"Prompt: {prompt}\nActual: {actual}\nPredicted: {predicted}\nInitial: {initial}\n")
 
         return self.execute_custom_code(rows)
 
@@ -473,7 +473,7 @@ def train(
             trainer,
             format,
             test_split,
-            num_samples=10,
+            num_samples=100,
             max_new_tokens=config["training"]["trainer"]["max_seq_length"],
             run_tests_str=config.get("tests", ""),
             run_metrics_str=config.get("metrics", ""),
@@ -526,8 +526,6 @@ def main() -> None:
     train_split, val_split, test_split = fetch_dataset(
         config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token
     )
-    if len(val_split) > 10:
-        val_split = val_split.select(range(10))
 
     print("Starting training")
     train(
