@@ -428,6 +428,8 @@ def train(
             test_split,
             num_samples=100,
             max_new_tokens=config["training"]["trainer"]["max_seq_length"],
+            run_tests_str=config.get("tests", ""),
+            run_metrics_str=config.get("metrics", ""),
         )
         trainer.add_callback(wandb_callback)
 
