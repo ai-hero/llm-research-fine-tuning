@@ -1,5 +1,4 @@
 """Launch the training job inside a container."""
-import json
 import os
 import random
 from typing import Any, Generator, Tuple
@@ -360,7 +359,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             run_metrics = local_namespace["run_metrics"]
             metrics = run_metrics(
                 [row["prompt"] for row in rows],
-                [json.dumps(row["actual"]) for row in rows],
+                [row["actual"] for row in rows],
                 [row["prediction"] for row in rows],
             )
         else:
