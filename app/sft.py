@@ -368,6 +368,13 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
         return records_table, metrics
 
+    def generate(self: "LLMSampleCB", prompt: str) -> Any:
+        """Generate a completion from a prompt."""
+        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
+        with torch.inference_mode():
+            output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
+        return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
+
     def samples_table_and_metrics(self) -> Tuple[Table, dict[str, Any]]:
         """Generate a table of predictions for visual inspection and evaluate them."""
         print("Generating predictions for sample split")
