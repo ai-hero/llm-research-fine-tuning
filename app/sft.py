@@ -297,27 +297,28 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             test_rows.append({"prompt": prompt, "actual": actual, "predicted": actual, "initial": actual})
         self.execute_custom_code(test_rows)
 
-    # def initialize(self: "LLMSampleCB") -> None:
-    #     """Generate initial predictions for the sample split and log them to WANDB."""
+    def initialize(self: "LLMSampleCB") -> None:
+        """Generate initial predictions for the sample split and log them to WANDB."""
+        self._wandb.init()
 
-    #     print("Generating initial predictions for sample split")
-    #     self.initial_predictions = []
-    #     for example in tqdm(self.sample_split, leave=False):
-    #         prompt = example["prompt"]
-    #         if not prompt.startswith(self.tokenizer.bos_token):
-    #             prompt = f"{self.tokenizer.bos_token}{prompt}"
-    #         predicted = self.generate(prompt=prompt)
-    #         self.initial_predictions.append(predicted)
+        print("Generating initial predictions for sample split")
+        self.initial_predictions = []
+        for example in tqdm(self.sample_split, leave=False):
+            prompt = example["prompt"]
+            if not prompt.startswith(self.tokenizer.bos_token):
+                prompt = f"{self.tokenizer.bos_token}{prompt}"
+            predicted = self.generate(prompt=prompt)
+            self.initial_predictions.append(predicted)
 
-    #     # Generate the table of sample predictions
-    #     records_table, metrics = self.samples_table_and_metrics()
+        # Generate the table of sample predictions
+        records_table, metrics = self.samples_table_and_metrics()
 
-    #     # Log the table of sample predictions to W&B
-    #     self._wandb.log({"sample_predictions": records_table})
+        # Log the table of sample predictions to W&B
+        self._wandb.log({"sample_predictions": records_table})
 
-    #     # Log the calculated metrics to W&B
-    #     self._wandb.log(metrics)
-    #     print("LLMSampleCB initialized")
+        # Log the calculated metrics to W&B
+        self._wandb.log(metrics)
+        print("LLMSampleCB initialized")
 
     def execute_custom_code(self, rows: list[dict[str, Any]]) -> Tuple[Table, dict[str, Any]]:
         """Execute custom code for tests and metrics."""
