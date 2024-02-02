@@ -1,4 +1,5 @@
 """Launch the training job inside a container."""
+import json
 import os
 import random
 from typing import Any, Generator, Tuple
@@ -264,6 +265,8 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         num_samples: int = 100,
         max_new_tokens: int = MAX_NEW_TOKENS,
         log_model: str = "checkpoint",
+        run_tests_str: str = "",
+        run_metrics_str: str = "",
     ):
         """Initialize the callback by extracting a few rows from the test split."""
         super().__init__()
@@ -289,6 +292,9 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             predicted = self.generate(prompt=prompt)
             self.initial_predictions.append(predicted)
 
+        self.run_tests_str = run_tests_str
+        self.run_metrics_str = run_metrics_str
+
     def generate(self: "LLMSampleCB", prompt: str) -> Any:
         """Generate a completion from a prompt."""
         tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
@@ -296,29 +302,71 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
         return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
 
-    def samples_table(self: "LLMSampleCB") -> Table:
-        """Generate a table of predictions for visual inspection."""
-        records_table = Table(
-            columns=["prompt", "predicted", "actual", "initial"]
-        )  # + list(self.gen_config.to_dict().keys())
-        index = 0
+    def samples_table_and_metrics(self) -> Tuple[Table, dict[str, Any]]:
+        """Generate a table of predictions for visual inspection and evaluate them."""
+        records_table = Table(columns=["prompt", "predicted", "actual", "initial", "test_result", "errors"])
+
+        # Generate rows of predictions
+        rows = []
         for example in tqdm(self.sample_split, leave=False):
             prompt = example["prompt"]
-            if not prompt.startswith(self.tokenizer.bos_token):
-                prompt = f"{self.tokenizer.bos_token}{prompt}"
             actual = example["completion"]
-            predicted = self.generate(prompt=prompt)
-            records_table.add_data(
-                prompt, predicted, actual, self.initial_predictions[index]
-            )  # , *list(self.gen_config.to_dict().values())
-            index += 1
-        return records_table
+            predicted = self.generate(prompt=prompt)  # Assuming self.generate is a method to generate predictions
+            rows.append({"prompt": prompt, "actual": actual, "prediction": predicted})
 
-    def on_evaluate(self: "LLMSampleCB", args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
-        """Log the sample predictions to WANDB on eval callback."""
+        # Prepare dynamic code execution
+        local_namespace: dict[str, Any] = {}
+        # Assuming run_tests_str and run_metrics_str contain your testing and metrics code respectively
+
+        if self.run_tests_str and os.environ.get("EXECUTE_TESTS", "false").lower() == "true":
+            # Execute dynamic code for tests
+            exec(self.run_tests_str, globals(), local_namespace)
+            test_completions = local_namespace["test_completions"]
+            tests, errors = test_completions([row["prompt"] for row in rows], [row["prediction"] for row in rows])
+        else:
+            tests, errors = ["N/A"] * len(rows), ["N/A"] * len(rows)
+
+        # Update records_table with the predictions, test results, and errors
+        index = 0
+        for example in tqdm(self.sample_split, leave=False):
+            test_result = "PASS" if tests[index] else "FAIL"
+            error_message = errors[index] if index < len(errors) else ""
+            records_table.add_data(
+                example["prompt"],
+                rows[index]["prediction"],
+                example["completion"],
+                self.initial_predictions[index],
+                test_result,
+                error_message,
+            )
+            index += 1
+
+        if self.run_metrics_str and os.environ.get("EXECUTE_METRICS", "false").lower() == "true":
+            # Execute dynamic code for metrics
+            exec(self.run_metrics_str, globals(), local_namespace)
+            get_metrics = local_namespace["get_metrics"]
+            metrics = get_metrics(
+                [row["prompt"] for row in rows],
+                [json.dumps(row["actual"]) for row in rows],
+                [row["prediction"] for row in rows],
+            )
+        else:
+            metrics = {"custom_metrics": "N/A"}
+
+        return records_table, metrics
+
+    def on_evaluate(self, args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
+        """Log the sample predictions and metrics to WANDB on eval callback."""
         super().on_evaluate(args, state, control, **kwargs)
-        records_table = self.samples_table()
+
+        # Generate the table of sample predictions
+        records_table, metrics = self.samples_table_and_metrics()
+
+        # Log the table of sample predictions to W&B
         self._wandb.log({"sample_predictions": records_table})
+
+        # Log the calculated metrics to W&B
+        self._wandb.log(metrics)
 
 
 def train(
