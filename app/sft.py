@@ -348,6 +348,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
             print("Skipping custom metrics")
             metrics = {}
 
+        print("Building table")
         index = 0
         passed = 0
         for row in tqdm(rows, leave=False):
