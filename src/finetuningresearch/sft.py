@@ -16,7 +16,7 @@ from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
 
-from utils import DatasetMover, dump_envs, load_config, peft_module_casting_to_bf16
+from .utils import DatasetMover, dump_envs, load_config, peft_module_casting_to_bf16
 
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
@@ -647,10 +647,11 @@ def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
         raise NotImplementedError("S3 support not implemented yet")
 
 
-def main() -> None:
+def execute(config: dict[str, Any] = {}) -> None:
     """Execute the main training loop."""
     dump_envs()
-    config = load_config()
+    if not config:
+        config = load_config()
 
     # Check if "training" is in config or "batch_inference" is in config, but not both.
     if "training" not in config and "batch_inference" not in config:
@@ -694,4 +695,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    Fire(main)
+    Fire(execute)

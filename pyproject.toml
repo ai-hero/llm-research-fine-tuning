@@ -1,18 +1,35 @@
 [project]
-name = "Fine-Tuning Reserch"
+name = "finetuningresearch"
 version = "0.1.0"
 description = "Open source research on fine-tuning LLMs"
-authors = ["Rahul Parundekar <rahul@aihero.studio>", "Shankar Ganesan <gshankar.87@gmail.com>"]
-license = "MIT"
+authors = [
+    {name = "Rahul Parundekar", email= "rahul@aihero.studio" },
+    {name = "Shankar Ganesan", email = "gshankar.87@gmail.com" }
+]
 readme = "README.md"
-homepage = "https://aihero.studio"
-repository = "https://github.com/ai-hero/fine_tune_research"
 classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
+]
+dependencies = [
+    "transformers>=4.35.0",
+    "peft>=0.5.0",
+    "bitsandbytes>=0.41.1",
+    "accelerate>=0.25.0",
+    "trl>=0.7.2",
+    "pydantic-settings>=2.0.3",
+    "scipy>=1.11.3",
+    "PyYAML>=6.0.1",
+    "datasets>=2.14.6",
+    "einops>=0.7.0",
+    "wandb>=0.15.12",
+    "python-dotenv",
+    "minio>=7.2.0",
+    "fire",
+    "types-PyYAML"
 ]
 
 [tool.pytest.ini_options]
