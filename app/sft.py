@@ -329,28 +329,21 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         print("Updating records_table with predictions, test results, and errors")
         if self.run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
             # Execute dynamic code for tests
-            def run_tests(prompts: list[str], predictions: list[str]) -> Tuple[list[bool], list[str]]:
-                return [False] * len(prompts), [""] * len(prompts)
-
             print("Running custom tests")
             exec(self.run_tests_str, globals())
-            tests, errors = run_tests([row["prompt"] for row in rows], [row["predicted"] for row in rows])  # noqa: F821
+            tests, errors = run_tests([row["prompt"] for row in rows], [row["predicted"] for row in rows])  # type: ignore  # noqa: F821
         else:
             print("Skipping custom tests")
             tests, errors = [False] * len(rows), [""] * len(rows)
 
         if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
-            def run_metrics(prompts: list[str], actuals: list[str], predictions: list[str]) -> dict[str, float]:
-                return {}
-
             print("Running custom metrics")
             exec(self.run_metrics_str, globals())
-            metrics = run_metrics(
-                [row["prompt"] for row in rows],
-                [row["actual"] for row in rows],
-                [row["predicted"] for row in rows],
-            )
+            pts = [row["prompt"] for row in rows]
+            acts = [row["actual"] for row in rows]
+            prds = [row["predicted"] for row in rows]
+            metrics = run_metrics(pts, acts, prds)  # type: ignore  # noqa: F821
         else:
             print("Skipping custom metrics")
             metrics = {}
