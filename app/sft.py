@@ -513,8 +513,9 @@ def train(
         args=sft_config,
     )
 
-    # format = config["dataset"].get("format", "text")
-    # if val_split and val_split.num_rows > 0 and format == "completion":
+    format = config["dataset"].get("format", "text")
+    if val_split and val_split.num_rows > 0 and format == "completion":
+        print(format)
 
     class EvaluateFirstStepCallback(TrainerCallback):  # type: ignore
         def on_step_end(self, args, state, control, **kwargs):  # type: ignore
