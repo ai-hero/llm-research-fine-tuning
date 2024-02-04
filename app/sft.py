@@ -3,13 +3,22 @@ import os
 import random
 from typing import Any, Generator, Tuple
 
+import numpy as np
 import torch
 from datasets import Dataset, load_dataset, load_from_disk
 from fire import Fire
 from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, GenerationConfig, TrainingArguments
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    EvalPrediction,
+    GenerationConfig,
+    TrainerCallback,
+    TrainingArguments,
+)
 from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
@@ -286,7 +295,9 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         self.sample_split = Dataset.from_list(self.sample_split)
 
         self.run_tests_str = run_tests_str
+        exec(self.run_tests_str, globals())
         self.run_metrics_str = run_metrics_str
+        exec(self.run_metrics_str, globals())
 
         # Test the provided code if present:
         print("Testing custom code, if provided")
@@ -330,7 +341,6 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         if self.run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
             # Execute dynamic code for tests
             print("Running custom tests")
-            exec(self.run_tests_str, globals())
             tests, errors = run_tests([row["prompt"] for row in rows], [row["predicted"] for row in rows])  # type: ignore  # noqa: F821
         else:
             print("Skipping custom tests")
@@ -339,7 +349,6 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
             print("Running custom metrics")
-            exec(self.run_metrics_str, globals())
             pts = [row["prompt"] for row in rows]
             acts = [row["actual"] for row in rows]
             prds = [row["predicted"] for row in rows]
@@ -415,6 +424,44 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         self._wandb.log(metrics)
 
 
+def preprocess_logits_for_metrics(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    """Preprocess logits for metrics."""
+    if isinstance(logits, tuple):
+        logits = logits[0]
+    return logits.argmax(dim=-1)
+
+
+def compute_metrics(eval_preds: EvalPrediction) -> dict[str, Any]:
+    """Compute metrics."""
+    preds, labels = eval_preds
+    print(np.shape(preds), np.shape(labels))
+    # if isinstance(preds, tuple):
+    #     preds = preds[0]
+
+    # # Replace -100 in the preds as we can't decode them
+    # preds = np.where(preds != -100, preds, self.tokenizer.pad_token_id)
+
+    # # Decode generated summaries into text
+    # decoded_preds = self.tokenizer.batch_decode(preds, skip_special_tokens=True)
+
+    # # Replace -100 in the labels as we can't decode them
+    # labels = np.where(labels != -100, labels, self.tokenizer.pad_token_id)
+    # # Decode reference summaries into text
+    # decoded_labels = self.tokenizer.batch_decode(labels, skip_special_tokens=True)
+    # # ROUGE expects a newline after each sentence
+    # decoded_preds = ["\n".join(pred.strip()) for pred in decoded_preds]
+
+    # decoded_labels = ["\n".join(label.strip()) for label in decoded_labels]
+    # # Compute ROUGscores
+    # result = rouge_score.compute(
+    #     predictions=decoded_preds, references=decoded_labels, use_stemmer=True
+    # )
+    # # Extract the median scores
+    # result = {key: value * 100 for key, value in result.items()}
+    # return {k: round(v, 4) for k, v in result.items()}
+    return {}
+
+
 def train(
     train_split: Dataset,
     val_split: Dataset,
@@ -462,23 +509,34 @@ def train(
         dataset_text_field="text",
         max_seq_length=config["training"]["trainer"]["max_seq_length"],
         packing=config["training"]["trainer"]["packing"],  # Should you combine multiple examples into one sequence?
+        compute_metrics=compute_metrics,
         args=sft_config,
     )
 
-    format = config["dataset"].get("format", "text")
-    if test_split and test_split.num_rows > 0 and format == "completion":
-        # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
-        wandb_callback = LLMSampleCB(
-            trainer,
-            format,
-            test_split,
-            num_samples=100,
-            max_new_tokens=config["training"]["trainer"]["max_seq_length"],
-            run_tests_str=config.get("tests", ""),
-            run_metrics_str=config.get("metrics", ""),
-        )
-        wandb_callback.initialize()
-        trainer.add_callback(wandb_callback)
+    # format = config["dataset"].get("format", "text")
+    # if val_split and val_split.num_rows > 0 and format == "completion":
+
+    class EvaluateFirstStepCallback(TrainerCallback):  # type: ignore
+        def on_step_end(self, args, state, control, **kwargs):  # type: ignore
+            if state.global_step == 1:
+                control.should_evaluate = True
+
+    trainer.add_callback(EvaluateFirstStepCallback())
+
+    # format = config["dataset"].get("format", "text")
+    # if test_split and test_split.num_rows > 0 and format == "completion":
+    #     # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
+    #     wandb_callback = LLMSampleCB(
+    #         trainer,
+    #         format,
+    #         test_split,
+    #         num_samples=100,
+    #         max_new_tokens=config["training"]["trainer"]["max_seq_length"],
+    #         run_tests_str=config.get("tests", ""),
+    #         run_metrics_str=config.get("metrics", ""),
+    #     )
+    #     wandb_callback.initialize()
+    #     trainer.add_callback(wandb_callback)
 
     print("Starting training")
     trainer.train()
