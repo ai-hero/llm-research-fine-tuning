@@ -2,7 +2,8 @@ name: Docker Image Creation
 on: [push]
 jobs:
   build:
-    runs-on: large-runner
+    runs-on:
+      labels: large-runner
     steps:
       -
         name: Checkout
