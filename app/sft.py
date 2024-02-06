@@ -188,7 +188,7 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Dat
                     "dataset": f"{DATASET_DIR}/{local_name}",
                     "split": "batch_inference",
                     "from_disk": True,
-                    "format": config["training"]["dataset"].get("format", "text"),
+                    "format": config["batch_inference"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
@@ -231,12 +231,14 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
 
+        device_map = {"": 0}
+
         if use_4bit:
             # Load base model
             model = AutoModelForCausalLM.from_pretrained(
                 training_or_batch_inference_config["model"]["base"]["name"],
                 quantization_config=bnb_config,
-                device_map={"": 0},
+                device_map=device_map,
             )
             model.config.use_cache = False
             model.config.pretraining_tp = 1
@@ -246,6 +248,7 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
                 torch_dtype=torch.bfloat16,
                 use_cache=False,
                 trust_remote_code=True,
+                device_map=device_map,
             )
         tokenizer = AutoTokenizer.from_pretrained(
             training_or_batch_inference_config["model"]["base"]["name"], trust_remote_code=True
@@ -331,7 +334,7 @@ class BatchInference:
             output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
         return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
 
-    def run_initial_predictions(self, rows: Dataset) -> Tuple[Table, dict[str, Any]]:
+    def run_initial_predictions(self, rows: Dataset) -> Tuple[list[dict[str, Any]], Tuple[Table, dict[str, Any]]]:
         """Generate initial predictions for the sample split."""
         # Test the provided code if present:
         print("Testing custom code, on ground truth if provided")
@@ -343,6 +346,7 @@ class BatchInference:
         self.execute_custom_code(test_rows)
 
         print("Generating initial predictions for sample split")
+        predicted_rows = []
         for example in tqdm(rows, leave=False):
             if self.format == "text":
                 prompt = example["text"]
@@ -353,13 +357,13 @@ class BatchInference:
             predicted = self.generate(prompt=prompt)
             self.initial_predictions.append(predicted)
             actual = example["completion"]
-            rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": predicted})
-        return self.execute_custom_code(rows)
+            predicted_rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": predicted})
+        return predicted_rows, self.execute_custom_code(predicted_rows)
 
-    def infer(self, rows: Dataset) -> Tuple[Table, dict[str, Any]]:
+    def infer(self, rows: Dataset) -> Tuple[list[dict[str, Any]], Tuple[Table, dict[str, Any]]]:
         """Generate batch predictions."""
         print("Generating predictions for sample split")
-        current_predictions = []
+        predicted_rows = []
         for i, example in tqdm(enumerate(rows), leave=False):
             if self.format == "text":
                 prompt = example["text"]
@@ -369,13 +373,11 @@ class BatchInference:
             if not prompt.startswith(self.tokenizer.bos_token):
                 prompt = f"{self.tokenizer.bos_token}{prompt}"
             predicted = self.generate(prompt=prompt)
-            current_predictions.append(predicted)
             row_obj = {"prompt": prompt, "actual": actual, "predicted": predicted}
             if self.initial_predictions:
                 row_obj["initial"] = self.initial_predictions[i]
-            rows.append(row_obj)
-
-        return self.execute_custom_code(rows)
+            predicted_rows.append(row_obj)
+        return predicted_rows, self.execute_custom_code(predicted_rows)
 
     def execute_custom_code(self, rows: list[dict[str, Any]]) -> Tuple[Table, dict[str, Any]]:
         """Execute custom code for tests and metrics."""
@@ -468,7 +470,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         """Generate initial predictions for the sample split and log them to WANDB."""
         self._wandb.init()
 
-        records_table, metrics = self.batch_inference.run_initial_predictions(self.sample_split)
+        _, (records_table, metrics) = self.batch_inference.run_initial_predictions(self.sample_split)
 
         # Log the table of sample predictions to W&B
         self._wandb.log({"sample_predictions": records_table})
@@ -482,7 +484,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         super().on_evaluate(args, state, control, **kwargs)
 
         # Generate the table of sample predictions
-        records_table, metrics = self.batch_inference.infer(self.sample_split)
+        _, (records_table, metrics) = self.batch_inference.infer(self.sample_split)
 
         # Log the table of sample predictions to W&B
         self._wandb.log({"sample_predictions": records_table})
@@ -502,12 +504,15 @@ def batch_inference(
     batch_inference = BatchInference(
         model=model,
         tokenizer=tokenizer,
-        format=config["batch_inference"]["format"],
+        format=config["batch_inference"]["dataset"].get("format", "text"),
         run_tests_str=config.get("tests", ""),
         run_metrics_str=config.get("metrics", ""),
-        max_new_tokens=config["batch_inference"]["max_new_tokens"],
+        max_new_tokens=config["batch_inference"]["generator"]["max_seq_length"],
     )
-    batch_inference.infer(batch_inference_split)
+    predicted_rows, (records_table, metrics) = batch_inference.infer(batch_inference_split)
+    print(predicted_rows)
+    print(records_table)
+    print(metrics)
 
 
 def train(
@@ -652,7 +657,7 @@ def main() -> None:
             config=config,
         )
         print("Save and Uploading results..")
-        print("todo")
+
     finish()
 
 
