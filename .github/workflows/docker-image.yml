@@ -2,7 +2,7 @@ name: Docker Image Creation
 on: [push]
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.03
     steps:
       -
         name: Checkout
