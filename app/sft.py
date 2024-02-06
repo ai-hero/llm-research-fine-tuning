@@ -17,7 +17,6 @@ from transformers import (
     BitsAndBytesConfig,
     EvalPrediction,
     GenerationConfig,
-    TrainerCallback,
     TrainingArguments,
 )
 from transformers.integrations import WandbCallback
@@ -597,12 +596,12 @@ def train(
     if val_split and val_split.num_rows > 0 and format == "completion":
         print(format)
 
-    class EvaluateFirstStepCallback(TrainerCallback):  # type: ignore
-        def on_step_end(self, args, state, control, **kwargs):  # type: ignore
-            if state.global_step == 1:
-                control.should_evaluate = True
+    # class EvaluateFirstStepCallback(TrainerCallback):  # type: ignore
+    #     def on_step_end(self, args, state, control, **kwargs):  # type: ignore
+    #         if state.global_step == 1:
+    #             control.should_evaluate = True
 
-    trainer.add_callback(EvaluateFirstStepCallback())
+    # trainer.add_callback(EvaluateFirstStepCallback())
 
     # format = config["training"]["dataset"].get("format", "text")
     # if test_split and test_split.num_rows > 0 and format == "completion":
