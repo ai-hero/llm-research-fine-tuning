@@ -1,6 +1,7 @@
 """Utility functions for the app. e.g. upload and download files from S3."""
 import os
 import tarfile
+from typing import Any
 
 import torch
 import yaml  # type: ignore
@@ -74,9 +75,9 @@ class DatasetMover:
         os.remove(temp_filename)  # Clean up the temporary compressed file
 
 
-def load_config() -> dict[str, str]:
+def load_config() -> dict[str, Any]:
     """Load the application configuration."""
-    config: dict[str, str] = {}
+    config: dict[str, Any] = {}
     if os.path.exists(MOUNTED_CONFIG_PATH):
         config_file = MOUNTED_CONFIG_PATH
         print("Loading mounted config")

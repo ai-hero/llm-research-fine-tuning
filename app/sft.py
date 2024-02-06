@@ -197,9 +197,9 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Dat
     return DatasetDict(splits)
 
 
-def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     """Load the model from HuggingFace Hub or S3."""
-    use_4bit = config["training"].get("peft", {}).pop("quantized", False)
+    use_4bit = training_or_batch_inference_config.get("peft", {}).pop("quantized", False)
 
     if use_4bit:
         # Compute dtype for 4-bit base models
@@ -227,39 +227,43 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
                 print("Your GPU supports bfloat16: accelerate training with bf16=True")
                 print("=" * 80)
 
-    if config["training"]["model"]["base"]["type"] == "hf":
+    if training_or_batch_inference_config["model"]["base"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
 
         if use_4bit:
             # Load base model
             model = AutoModelForCausalLM.from_pretrained(
-                config["training"]["model"]["base"]["name"], quantization_config=bnb_config, device_map={"": 0}
+                training_or_batch_inference_config["model"]["base"]["name"],
+                quantization_config=bnb_config,
+                device_map={"": 0},
             )
             model.config.use_cache = False
             model.config.pretraining_tp = 1
         else:
             model = AutoModelForCausalLM.from_pretrained(
-                config["training"]["model"]["base"]["name"],
+                training_or_batch_inference_config["model"]["base"]["name"],
                 torch_dtype=torch.bfloat16,
                 use_cache=False,
                 trust_remote_code=True,
             )
-        tokenizer = AutoTokenizer.from_pretrained(config["training"]["model"]["base"]["name"], trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            training_or_batch_inference_config["model"]["base"]["name"], trust_remote_code=True
+        )
         # May need to have some custom padding logic here
         special_tokens = {"pad_token": "[PAD]"}
         tokenizer.add_special_tokens(special_tokens)
-        if "additional_tokens" in config["training"].get("tokenizer", {}):
-            tokenizer.add_tokens(config["training"]["tokenizer"]["additional_tokens"])
+        if "additional_tokens" in training_or_batch_inference_config.get("tokenizer", {}):
+            tokenizer.add_tokens(training_or_batch_inference_config["tokenizer"]["additional_tokens"])
         tokenizer.padding_side = "right"
         model.config.pad_token_id = tokenizer.pad_token_id
         model.resize_token_embeddings(len(tokenizer))
 
-    elif config["training"]["model"]["base"]["type"] == "s3":
+    elif training_or_batch_inference_config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
     else:
-        raise ValueError(f"Unknown base_model_type: {config['model']['base']['type']}")
+        raise ValueError(f"Unknown base_model_type: {training_or_batch_inference_config['model']['base']['type']}")
     return model, tokenizer
 
 
@@ -610,17 +614,19 @@ def main() -> None:
     """Execute the main training loop."""
     dump_envs()
     config = load_config()
-    print("Loading model")
-    model, tokenizer = load_model(config)
-    print("Loading dataset")
-    dataset_dict = fetch_dataset(config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token)
 
     # Check if "training" is in config or "batch_inference" is in config, but not both.
     if "training" not in config and "batch_inference" not in config:
         raise ValueError("Either 'training' or 'batch_inference' must be defined in the config")
     elif "training" in config and "batch_inference" in config:
         raise ValueError("Only one of 'training' or 'batch_inference' must be defined in the config")
-    elif "training" in config:
+
+    if "training" in config:
+        print("Loading model")
+        training_config: dict[str, Any] = config["training"]
+        model, tokenizer = load_model(training_or_batch_inference_config=training_config)
+        print("Loading dataset")
+        dataset_dict = fetch_dataset(config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token)
         print("Starting training")
         train(
             train_split=dataset_dict["train"],
@@ -633,6 +639,11 @@ def main() -> None:
         print("Save and Uploading model..")
         save_model(model, tokenizer, config)
     elif "batch_inference" in config:
+        print("Loading model")
+        batch_inference_config: dict[str, Any] = config["batch_inference"]
+        model, tokenizer = load_model(training_or_batch_inference_config=batch_inference_config)
+        print("Loading dataset")
+        dataset_dict = fetch_dataset(config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token)
         print("Starting batch inference")
         batch_inference(
             batch_inference_split=dataset_dict["batch_inference"],
