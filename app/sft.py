@@ -62,15 +62,15 @@ def training_generator(
 
 def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tuple[Dataset, Dataset, Dataset]:
     """Fetch the dataset from HuggingFace Hub or S3."""
-    if config["dataset"]["type"] == "hf":
+    if config["training"]["dataset"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
         train_split = Dataset.from_generator(
             training_generator,
             gen_kwargs={
-                "dataset": config["dataset"]["name"],
+                "dataset": config["training"]["dataset"]["name"],
                 "split": "train",
-                "format": config["dataset"].get("format", "text"),
+                "format": config["training"]["dataset"].get("format", "text"),
                 "bos_token": bos_token,
                 "eos_token": eos_token,
             },
@@ -79,9 +79,9 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tup
             val_split = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
-                    "dataset": config["dataset"]["name"],
+                    "dataset": config["training"]["dataset"]["name"],
                     "split": "val",
-                    "format": config["dataset"].get("format", "text"),
+                    "format": config["training"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
@@ -93,9 +93,9 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tup
             test_split = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
-                    "dataset": config["dataset"]["name"],
+                    "dataset": config["training"]["dataset"]["name"],
                     "split": "test",
-                    "format": config["dataset"].get("format", "text"),
+                    "format": config["training"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
@@ -103,12 +103,12 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tup
         except:  # pylint: disable=bare-except  # noqa: E722
             print("Unable to create test dataset")
             test_split = None
-    elif config["dataset"]["type"] == "s3":
+    elif config["training"]["dataset"]["type"] == "s3":
         os.makedirs(DATASET_DIR)
         dataset_mover = DatasetMover()
-        local_name = config["dataset"]["name"][config["dataset"]["name"].find("/") + 1 :]
+        local_name = config["training"]["dataset"]["name"][config["training"]["dataset"]["name"].find("/") + 1 :]
         dataset_mover.download(
-            bucket_name=config["dataset"]["name"].split("/")[0],
+            bucket_name=config["training"]["dataset"]["name"].split("/")[0],
             object_name=f"{local_name}.tar.gz",
             output_folder_path=DATASET_DIR,
         )
@@ -120,7 +120,7 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tup
                 "dataset": f"{DATASET_DIR}/{local_name}",
                 "split": "train",
                 "from_disk": True,
-                "format": config["dataset"].get("format", "text"),
+                "format": config["training"]["dataset"].get("format", "text"),
                 "bos_token": bos_token,
                 "eos_token": eos_token,
             },
@@ -132,7 +132,7 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tup
                     "dataset": f"{DATASET_DIR}/{local_name}",
                     "split": "val",
                     "from_disk": True,
-                    "format": config["dataset"].get("format", "text"),
+                    "format": config["training"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
@@ -147,7 +147,7 @@ def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tup
                     "dataset": f"{DATASET_DIR}/{local_name}",
                     "split": "test",
                     "from_disk": True,
-                    "format": config["dataset"].get("format", "text"),
+                    "format": config["training"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
@@ -190,35 +190,35 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
                 print("Your GPU supports bfloat16: accelerate training with bf16=True")
                 print("=" * 80)
 
-    if config["model"]["base"]["type"] == "hf":
+    if config["training"]["model"]["base"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
 
         if use_4bit:
             # Load base model
             model = AutoModelForCausalLM.from_pretrained(
-                config["model"]["base"]["name"], quantization_config=bnb_config, device_map={"": 0}
+                config["training"]["model"]["base"]["name"], quantization_config=bnb_config, device_map={"": 0}
             )
             model.config.use_cache = False
             model.config.pretraining_tp = 1
         else:
             model = AutoModelForCausalLM.from_pretrained(
-                config["model"]["base"]["name"],
+                config["training"]["model"]["base"]["name"],
                 torch_dtype=torch.bfloat16,
                 use_cache=False,
                 trust_remote_code=True,
             )
-        tokenizer = AutoTokenizer.from_pretrained(config["model"]["base"]["name"], trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(config["training"]["model"]["base"]["name"], trust_remote_code=True)
         # May need to have some custom padding logic here
         special_tokens = {"pad_token": "[PAD]"}
         tokenizer.add_special_tokens(special_tokens)
-        if "additional_tokens" in config.get("tokenizer", {}):
-            tokenizer.add_tokens(config["tokenizer"]["additional_tokens"])
+        if "additional_tokens" in config["training"].get("tokenizer", {}):
+            tokenizer.add_tokens(config["training"]["tokenizer"]["additional_tokens"])
         tokenizer.padding_side = "right"
         model.config.pad_token_id = tokenizer.pad_token_id
         model.resize_token_embeddings(len(tokenizer))
 
-    elif config["model"]["base"]["type"] == "s3":
+    elif config["training"]["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
     else:
@@ -465,20 +465,20 @@ def train(
         args=sft_config,
     )
 
-    format = config["dataset"].get("format", "text")
-    if test_split and test_split.num_rows > 0 and format == "completion":
-        # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
-        wandb_callback = LLMSampleCB(
-            trainer,
-            format,
-            test_split,
-            num_samples=100,
-            max_new_tokens=config["training"]["trainer"]["max_seq_length"],
-            run_tests_str=config.get("tests", ""),
-            run_metrics_str=config.get("metrics", ""),
-        )
-        wandb_callback.initialize()
-        trainer.add_callback(wandb_callback)
+    # format = config["training"]["dataset"].get("format", "text")
+    # if test_split and test_split.num_rows > 0 and format == "completion":
+    #     # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
+    #     wandb_callback = LLMSampleCB(
+    #         trainer,
+    #         format,
+    #         test_split,
+    #         num_samples=100,
+    #         max_new_tokens=config["training"]["trainer"]["max_seq_length"],
+    #         run_tests_str=config.get("tests", ""),
+    #         run_metrics_str=config.get("metrics", ""),
+    #     )
+    #     wandb_callback.initialize()
+    #     trainer.add_callback(wandb_callback)
 
     print("Starting training")
     trainer.train()
@@ -494,7 +494,7 @@ def train(
 def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
     """Save the model to a local directory."""
     print("Saving model and tokenizer")
-    local_name = config["model"]["output"]["name"].split("/")[-1]
+    local_name = config["training"]["model"]["output"]["name"].split("/")[-1]
     model.save_pretrained(local_name)
     tokenizer.save_pretrained(local_name)
     print(os.listdir(local_name))
@@ -502,15 +502,15 @@ def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
     """Upload the model to HuggingFace Hub or S3."""
     if os.getenv("RANK", "0") != "0":
         return
-    if "output" not in config["model"]:
+    if "output" not in config["training"]["model"]:
         return
-    if config["model"]["output"]["type"] == "hf":
+    if config["training"]["model"]["output"]["type"] == "hf":
         print("Saving model and tokenizer to hf")
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
         model.push_to_hub(local_name)
         tokenizer.push_to_hub(local_name)
-    elif config["model"]["output"]["type"] == "s3":
+    elif config["training"]["model"]["output"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
 

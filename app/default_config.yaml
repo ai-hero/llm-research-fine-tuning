@@ -1,20 +1,18 @@
 project:
   name: "fine_tune_research"
 
-dataset:
-  type: "hf"
-  name: "mlabonne/guanaco-llama2-1k"
-  format: "text"
-
-model:
-  base:
-    type: "hf"
-    name: "meta-llama/Llama-2-7b-hf"
-  output:
-    type: "hf"
-    name: "rparundekar/llama2-7b-guanaco"
-
 training:
+  model:
+    base:
+      type: "hf"
+      name: "meta-llama/Llama-2-7b-hf"
+    output:
+      type: "hf"
+      name: "rparundekar/llama2-7b-guanaco"
+  dataset:
+    type: "hf"
+    name: "mlabonne/guanaco-llama2-1k"
+    format: "text"
   trainer:
     packing: False
     max_seq_length: 512
