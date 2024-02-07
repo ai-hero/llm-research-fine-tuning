@@ -1,6 +1,7 @@
 """Launch the training job inside a container."""
 import os
 import random
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Generator, Tuple
 
@@ -516,6 +517,7 @@ def batch_inference(
     print(metrics)
 
     with TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
         # If you're creating a new dataset from scratch:
         dataset_dict = DatasetDict(
             {"predictions": Dataset.from_list(predicted_rows)}  # Assign the new dataset as the train split
@@ -526,11 +528,11 @@ def batch_inference(
 
         dataset_info = DatasetInfo(
             description=f"Contains output for {short_name} from batch inference",
-            version="1.0",
+            version="1.0.0",
         )
         for split, dataset in dataset_dict.items():
             dataset.dataset_info = dataset_info
-        dataset_path = (temp_dir / short_name).as_posix()
+        dataset_path = (temp_dir_path / short_name).as_posix()
         dataset_dict.save_to_disk(dataset_path)
 
         # Compress the folder
