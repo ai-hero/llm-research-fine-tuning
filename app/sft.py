@@ -1,10 +1,11 @@
 """Launch the training job inside a container."""
 import os
 import random
+from tempfile import TemporaryDirectory
 from typing import Any, Generator, Tuple
 
 import torch
-from datasets import Dataset, DatasetDict, load_dataset, load_from_disk
+from datasets import Dataset, DatasetDict, DatasetInfo, load_dataset, load_from_disk
 from fire import Fire
 from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
@@ -513,6 +514,33 @@ def batch_inference(
     print(predicted_rows)
     print(records_table)
     print(metrics)
+
+    with TemporaryDirectory() as temp_dir:
+        # If you're creating a new dataset from scratch:
+        dataset_dict = DatasetDict(
+            {"predictions": Dataset.from_list(predicted_rows)}  # Assign the new dataset as the train split
+        )
+
+        short_name = config["batch_inference"]["dataset"]["name"].split("/")[-1] + "-output"
+        print(f"Converting {short_name} to dataset dict")
+
+        dataset_info = DatasetInfo(
+            description=f"Contains output for {short_name} from batch inference",
+            version="1.0",
+        )
+        for split, dataset in dataset_dict.items():
+            dataset.dataset_info = dataset_info
+        dataset_path = (temp_dir / short_name).as_posix()
+        dataset_dict.save_to_disk(dataset_path)
+
+        # Compress the folder
+        print(f"Compressing the folder {dataset_path}")
+        folder_to_compress = dataset_path
+        output_tar_file = f"{short_name}-output.tar.gz"
+        bucket_name = "fine-tuning-research"
+        print(f"Uploading {output_tar_file} to {bucket_name}")
+        dataset_mover = DatasetMover()
+        dataset_mover.upload(folder_to_compress, output_tar_file, bucket_name)
 
 
 def train(
