@@ -1,10 +1,12 @@
 """Launch the training job inside a container."""
 import os
 import random
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Generator, Tuple
 
 import torch
-from datasets import Dataset, load_dataset, load_from_disk
+from datasets import Dataset, DatasetDict, DatasetInfo, load_dataset, load_from_disk
 from fire import Fire
 from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
@@ -60,109 +62,146 @@ def training_generator(
             raise Exception(f"Unknown format: {format}")
 
 
-def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> Tuple[Dataset, Dataset, Dataset]:
+def fetch_dataset(config: dict[str, Any], bos_token: str, eos_token: str) -> DatasetDict:
     """Fetch the dataset from HuggingFace Hub or S3."""
-    if config["training"]["dataset"]["type"] == "hf":
-        if os.environ.get("HF_TOKEN", None):
-            login(token=os.environ["HF_TOKEN"])
-        train_split = Dataset.from_generator(
-            training_generator,
-            gen_kwargs={
-                "dataset": config["training"]["dataset"]["name"],
-                "split": "train",
-                "format": config["training"]["dataset"].get("format", "text"),
-                "bos_token": bos_token,
-                "eos_token": eos_token,
-            },
-        )
-        try:
-            val_split = Dataset.from_generator(
+    splits = {}
+    if "training" in config:
+        if config["training"]["dataset"]["type"] == "hf":
+            if os.environ.get("HF_TOKEN", None):
+                login(token=os.environ["HF_TOKEN"])
+            splits["train"] = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
                     "dataset": config["training"]["dataset"]["name"],
-                    "split": "val",
+                    "split": "train",
                     "format": config["training"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
             )
-        except:  # pylint: disable=bare-except  # noqa: E722
-            print("Unable to create val dataset")
-            val_split = None
-        try:
-            test_split = Dataset.from_generator(
-                training_generator,
-                gen_kwargs={
-                    "dataset": config["training"]["dataset"]["name"],
-                    "split": "test",
-                    "format": config["training"]["dataset"].get("format", "text"),
-                    "bos_token": bos_token,
-                    "eos_token": eos_token,
-                },
+            try:
+                splits["val"] = Dataset.from_generator(
+                    training_generator,
+                    gen_kwargs={
+                        "dataset": config["training"]["dataset"]["name"],
+                        "split": "val",
+                        "format": config["training"]["dataset"].get("format", "text"),
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+            except:  # pylint: disable=bare-except  # noqa: E722
+                print("Unable to create val dataset")
+            try:
+                splits["test"] = Dataset.from_generator(
+                    training_generator,
+                    gen_kwargs={
+                        "dataset": config["training"]["dataset"]["name"],
+                        "split": "test",
+                        "format": config["training"]["dataset"].get("format", "text"),
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+            except:  # pylint: disable=bare-except  # noqa: E722
+                print("Unable to create test dataset")
+        elif config["training"]["dataset"]["type"] == "s3":
+            os.makedirs(DATASET_DIR)
+            dataset_mover = DatasetMover()
+            local_name = config["training"]["dataset"]["name"][config["training"]["dataset"]["name"].find("/") + 1 :]
+            dataset_mover.download(
+                bucket_name=config["training"]["dataset"]["name"].split("/")[0],
+                object_name=f"{local_name}.tar.gz",
+                output_folder_path=DATASET_DIR,
             )
-        except:  # pylint: disable=bare-except  # noqa: E722
-            print("Unable to create test dataset")
-            test_split = None
-    elif config["training"]["dataset"]["type"] == "s3":
-        os.makedirs(DATASET_DIR)
-        dataset_mover = DatasetMover()
-        local_name = config["training"]["dataset"]["name"][config["training"]["dataset"]["name"].find("/") + 1 :]
-        dataset_mover.download(
-            bucket_name=config["training"]["dataset"]["name"].split("/")[0],
-            object_name=f"{local_name}.tar.gz",
-            output_folder_path=DATASET_DIR,
-        )
-        print(os.listdir(DATASET_DIR))
-        print(os.listdir(f"{DATASET_DIR}/{local_name}"))
-        train_split = Dataset.from_generator(
-            training_generator,
-            gen_kwargs={
-                "dataset": f"{DATASET_DIR}/{local_name}",
-                "split": "train",
-                "from_disk": True,
-                "format": config["training"]["dataset"].get("format", "text"),
-                "bos_token": bos_token,
-                "eos_token": eos_token,
-            },
-        )
-        try:
-            val_split = Dataset.from_generator(
+            print(os.listdir(DATASET_DIR))
+            print(os.listdir(f"{DATASET_DIR}/{local_name}"))
+            splits["train"] = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
                     "dataset": f"{DATASET_DIR}/{local_name}",
-                    "split": "val",
+                    "split": "train",
                     "from_disk": True,
                     "format": config["training"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
             )
-        except:  # pylint: disable=bare-except  # noqa: E722
-            print("Unable to create val dataset")
-            val_split = None
-        try:
-            test_split = Dataset.from_generator(
+            try:
+                splits["val"] = Dataset.from_generator(
+                    training_generator,
+                    gen_kwargs={
+                        "dataset": f"{DATASET_DIR}/{local_name}",
+                        "split": "val",
+                        "from_disk": True,
+                        "format": config["training"]["dataset"].get("format", "text"),
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+            except:  # pylint: disable=bare-except  # noqa: E722
+                print("Unable to create val dataset")
+            try:
+                splits["test"] = Dataset.from_generator(
+                    training_generator,
+                    gen_kwargs={
+                        "dataset": f"{DATASET_DIR}/{local_name}",
+                        "split": "test",
+                        "from_disk": True,
+                        "format": config["training"]["dataset"].get("format", "text"),
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+            except:  # pylint: disable=bare-except  # noqa: E722
+                print("Unable to create test dataset")
+        else:
+            raise ValueError(f"Unknown dataset_type: {config['dataset']['type']}")
+    if "batch_inference" in config:
+        if config["batch_inference"]["dataset"]["type"] == "hf":
+            if os.environ.get("HF_TOKEN", None):
+                login(token=os.environ["HF_TOKEN"])
+            splits["train"] = Dataset.from_generator(
                 training_generator,
                 gen_kwargs={
-                    "dataset": f"{DATASET_DIR}/{local_name}",
-                    "split": "test",
-                    "from_disk": True,
-                    "format": config["training"]["dataset"].get("format", "text"),
+                    "dataset": config["batch_inference"]["dataset"]["name"],
+                    "split": "batch_inference",
+                    "format": config["batch_inference"]["dataset"].get("format", "text"),
                     "bos_token": bos_token,
                     "eos_token": eos_token,
                 },
             )
-        except:  # pylint: disable=bare-except  # noqa: E722
-            print("Unable to create test dataset")
-            test_split = None
-    else:
-        raise ValueError(f"Unknown dataset_type: {config['dataset']['type']}")
-    return train_split, val_split, test_split
+        elif config["batch_inference"]["dataset"]["type"] == "s3":
+            os.makedirs(DATASET_DIR)
+            dataset_mover = DatasetMover()
+            local_name = config["batch_inference"]["dataset"]["name"][
+                config["batch_inference"]["dataset"]["name"].find("/") + 1 :
+            ]
+            dataset_mover.download(
+                bucket_name=config["batch_inference"]["dataset"]["name"].split("/")[0],
+                object_name=f"{local_name}.tar.gz",
+                output_folder_path=DATASET_DIR,
+            )
+            print(os.listdir(DATASET_DIR))
+            print(os.listdir(f"{DATASET_DIR}/{local_name}"))
+            splits["batch_inference"] = Dataset.from_generator(
+                training_generator,
+                gen_kwargs={
+                    "dataset": f"{DATASET_DIR}/{local_name}",
+                    "split": "batch_inference",
+                    "from_disk": True,
+                    "format": config["batch_inference"]["dataset"].get("format", "text"),
+                    "bos_token": bos_token,
+                    "eos_token": eos_token,
+                },
+            )
+
+    return DatasetDict(splits)
 
 
-def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
+def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
     """Load the model from HuggingFace Hub or S3."""
-    use_4bit = config["training"].get("peft", {}).pop("quantized", False)
+    use_4bit = training_or_batch_inference_config.get("peft", {}).pop("quantized", False)
 
     if use_4bit:
         # Compute dtype for 4-bit base models
@@ -190,39 +229,46 @@ def load_model(config: dict[str, Any]) -> Tuple[AutoModelForCausalLM, AutoTokeni
                 print("Your GPU supports bfloat16: accelerate training with bf16=True")
                 print("=" * 80)
 
-    if config["training"]["model"]["base"]["type"] == "hf":
+    if training_or_batch_inference_config["model"]["base"]["type"] == "hf":
         if os.environ.get("HF_TOKEN", None):
             login(token=os.environ["HF_TOKEN"])
+
+        device_map = {"": 0}
 
         if use_4bit:
             # Load base model
             model = AutoModelForCausalLM.from_pretrained(
-                config["training"]["model"]["base"]["name"], quantization_config=bnb_config, device_map={"": 0}
+                training_or_batch_inference_config["model"]["base"]["name"],
+                quantization_config=bnb_config,
+                device_map=device_map,
             )
             model.config.use_cache = False
             model.config.pretraining_tp = 1
         else:
             model = AutoModelForCausalLM.from_pretrained(
-                config["training"]["model"]["base"]["name"],
+                training_or_batch_inference_config["model"]["base"]["name"],
                 torch_dtype=torch.bfloat16,
                 use_cache=False,
                 trust_remote_code=True,
+                device_map=device_map,
             )
-        tokenizer = AutoTokenizer.from_pretrained(config["training"]["model"]["base"]["name"], trust_remote_code=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            training_or_batch_inference_config["model"]["base"]["name"], trust_remote_code=True
+        )
         # May need to have some custom padding logic here
         special_tokens = {"pad_token": "[PAD]"}
         tokenizer.add_special_tokens(special_tokens)
-        if "additional_tokens" in config["training"].get("tokenizer", {}):
-            tokenizer.add_tokens(config["training"]["tokenizer"]["additional_tokens"])
+        if "additional_tokens" in training_or_batch_inference_config.get("tokenizer", {}):
+            tokenizer.add_tokens(training_or_batch_inference_config["tokenizer"]["additional_tokens"])
         tokenizer.padding_side = "right"
         model.config.pad_token_id = tokenizer.pad_token_id
         model.resize_token_embeddings(len(tokenizer))
 
-    elif config["training"]["model"]["base"]["type"] == "s3":
+    elif training_or_batch_inference_config["model"]["base"]["type"] == "s3":
         # TODO : Add s3 support
         raise NotImplementedError("S3 support not implemented yet")
     else:
-        raise ValueError(f"Unknown base_model_type: {config['model']['base']['type']}")
+        raise ValueError(f"Unknown base_model_type: {training_or_batch_inference_config['model']['base']['type']}")
     return model, tokenizer
 
 
@@ -253,72 +299,87 @@ def freeze(model: AutoModelForCausalLM, n_freeze: int, freeze_embed: bool, modul
         embed_tokens.weight.requires_grad_(False)
 
 
-class LLMSampleCB(WandbCallback):  # type: ignore
-    """Callback for sampling from a LLM and reporting custom eval to WANDB."""
+class BatchInference:
+    """Batch inference class for generating predictions and running custom tests and metrics."""
 
     def __init__(
-        self: "LLMSampleCB",
-        trainer: SFTTrainer,
+        self,
+        model: AutoModelForCausalLM,
+        tokenizer: AutoTokenizer,
         format: str,
-        test_split: Dataset,
-        num_samples: int = 100,
-        max_new_tokens: int = MAX_NEW_TOKENS,
-        log_model: str = "checkpoint",
         run_tests_str: str = "",
         run_metrics_str: str = "",
+        max_new_tokens: int = MAX_NEW_TOKENS,
+        batch_size: int = 8,
     ):
-        """Initialize the callback by extracting a few rows from the test split."""
-        super().__init__()
-        assert format == "completion", "Only completion format supported for now"
-        self._log_model = log_model
-        self.model, self.tokenizer = trainer.model, trainer.tokenizer
-        self.gen_config = GenerationConfig.from_pretrained(trainer.model.name_or_path, max_new_tokens=max_new_tokens)
-
-        # Sample a few rows from the test split to generate a table of predictions
-        # for visual inspection a.k.a. spot checking
-        # Randomly select indices for the samples
-        selected_indices = random.sample(range(test_split.num_rows), num_samples)
-        # Retrieve the selected samples from the dataset
-        test_split_list = list(test_split)
-        self.sample_split = []
-        for i in selected_indices:
-            self.sample_split.append(test_split_list[i])
-        self.sample_split = Dataset.from_list(self.sample_split)
-
+        """Initialize the batch inference class."""
+        self.gen_config = GenerationConfig.from_pretrained(model.name_or_path, max_new_tokens=max_new_tokens)
+        self.model = model
+        self.tokenizer = tokenizer
+        self.format = format
         self.run_tests_str = run_tests_str
+        if run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
+            exec(self.run_tests_str, globals())
+        else:
+            self.run_tests_str = ""
         self.run_metrics_str = run_metrics_str
+        if run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
+            exec(self.run_metrics_str, globals())
+        else:
+            self.run_metrics_str = ""
+        self.initial_predictions: list[str] = []
 
+    def generate(self, prompt: str) -> Any:
+        """Generate a completion from a prompt."""
+        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
+        with torch.inference_mode():
+            output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
+        return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
+
+    def run_initial_predictions(self, rows: Dataset) -> Tuple[list[dict[str, Any]], Tuple[Table, dict[str, Any]]]:
+        """Generate initial predictions for the sample split."""
         # Test the provided code if present:
-        print("Testing custom code, if provided")
+        print("Testing custom code, on ground truth if provided")
         test_rows = []
-        for example in tqdm(self.sample_split, leave=False):
+        for example in tqdm(rows, leave=False):
             prompt = example["prompt"]
             actual = example["completion"]
             test_rows.append({"prompt": prompt, "actual": actual, "predicted": actual, "initial": actual})
         self.execute_custom_code(test_rows)
 
-    def initialize(self: "LLMSampleCB") -> None:
-        """Generate initial predictions for the sample split and log them to WANDB."""
-        self._wandb.init()
-
         print("Generating initial predictions for sample split")
-        self.initial_predictions = []
-        for example in tqdm(self.sample_split, leave=False):
-            prompt = example["prompt"]
+        predicted_rows = []
+        for example in tqdm(rows, leave=False):
+            if self.format == "text":
+                prompt = example["text"]
+            else:
+                prompt = example["prompt"]
             if not prompt.startswith(self.tokenizer.bos_token):
                 prompt = f"{self.tokenizer.bos_token}{prompt}"
             predicted = self.generate(prompt=prompt)
             self.initial_predictions.append(predicted)
+            actual = example["completion"]
+            predicted_rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": predicted})
+        return predicted_rows, self.execute_custom_code(predicted_rows)
 
-        # Generate the table of sample predictions
-        records_table, metrics = self.samples_table_and_metrics()
-
-        # Log the table of sample predictions to W&B
-        self._wandb.log({"sample_predictions": records_table})
-
-        # Log the calculated metrics to W&B
-        self._wandb.log(metrics)
-        print("LLMSampleCB initialized")
+    def infer(self, rows: Dataset) -> Tuple[list[dict[str, Any]], Tuple[Table, dict[str, Any]]]:
+        """Generate batch predictions."""
+        print("Generating predictions for sample split")
+        predicted_rows = []
+        for i, example in tqdm(enumerate(rows), leave=False):
+            if self.format == "text":
+                prompt = example["text"]
+            else:
+                prompt = example["prompt"]
+            actual = example["completion"]
+            if not prompt.startswith(self.tokenizer.bos_token):
+                prompt = f"{self.tokenizer.bos_token}{prompt}"
+            predicted = self.generate(prompt=prompt)
+            row_obj = {"prompt": prompt, "actual": actual, "predicted": predicted}
+            if self.initial_predictions:
+                row_obj["initial"] = self.initial_predictions[i]
+            predicted_rows.append(row_obj)
+        return predicted_rows, self.execute_custom_code(predicted_rows)
 
     def execute_custom_code(self, rows: list[dict[str, Any]]) -> Tuple[Table, dict[str, Any]]:
         """Execute custom code for tests and metrics."""
@@ -330,7 +391,6 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         if self.run_tests_str and os.environ.get("ALLOW_CUSTOM_TESTS", "false").lower() == "true":
             # Execute dynamic code for tests
             print("Running custom tests")
-            exec(self.run_tests_str, globals())
             tests, errors = run_tests([row["prompt"] for row in rows], [row["predicted"] for row in rows])  # type: ignore  # noqa: F821
         else:
             print("Skipping custom tests")
@@ -339,7 +399,6 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         if self.run_metrics_str and os.environ.get("ALLOW_CUSTOM_METRICS", "false").lower() == "true":
             # Execute dynamic code for metrics
             print("Running custom metrics")
-            exec(self.run_metrics_str, globals())
             pts = [row["prompt"] for row in rows]
             acts = [row["actual"] for row in rows]
             prds = [row["predicted"] for row in rows]
@@ -359,7 +418,7 @@ class LLMSampleCB(WandbCallback):  # type: ignore
                 row["prompt"],
                 row["predicted"],
                 row["actual"],
-                row["initial"],
+                row.get("initial", "N/A"),
                 test_result,
                 error_message,
             )
@@ -370,49 +429,120 @@ class LLMSampleCB(WandbCallback):  # type: ignore
 
         return records_table, metrics
 
-    def generate(self: "LLMSampleCB", prompt: str) -> Any:
-        """Generate a completion from a prompt."""
-        tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
-        with torch.inference_mode():
-            output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
-        return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
 
-    def samples_table_and_metrics(self) -> Tuple[Table, dict[str, Any]]:
-        """Generate a table of predictions for visual inspection and evaluate them."""
-        print("Generating predictions for sample split")
-        current_predictions = []
-        for example in tqdm(self.sample_split, leave=False):
-            prompt = example["prompt"]
-            if not prompt.startswith(self.tokenizer.bos_token):
-                prompt = f"{self.tokenizer.bos_token}{prompt}"
-            predicted = self.generate(prompt=prompt)
-            current_predictions.append(predicted)
+class LLMSampleCB(WandbCallback):  # type: ignore
+    """Callback for sampling from a LLM and reporting custom eval to WANDB."""
 
-        # Generate rows of predictions
-        rows = []
-        for example, current, initial in tqdm(
-            zip(self.sample_split, current_predictions, self.initial_predictions), leave=False
-        ):
-            prompt = example["prompt"]
-            actual = example["completion"]
-            predicted = current
-            rows.append({"prompt": prompt, "actual": actual, "predicted": predicted, "initial": initial})
-            # print(f"Prompt: {prompt}\nActual: {actual}\nPredicted: {predicted}\nInitial: {initial}\n")
+    def __init__(
+        self: "LLMSampleCB",
+        trainer: SFTTrainer,
+        format: str,
+        test_split: Dataset,
+        num_samples: int = 100,
+        max_new_tokens: int = MAX_NEW_TOKENS,
+        log_model: str = "checkpoint",
+        run_tests_str: str = "",
+        run_metrics_str: str = "",
+    ):
+        """Initialize the callback by extracting a few rows from the test split."""
+        super().__init__()
+        assert format == "completion", "Only completion format supported for now"
+        self._log_model = log_model
+        self.batch_inference = BatchInference(
+            model=trainer.model,
+            tokenizer=trainer.tokenizer,
+            format=format,
+            run_tests_str=run_tests_str,
+            run_metrics_str=run_metrics_str,
+            max_new_tokens=max_new_tokens,
+        )
 
-        return self.execute_custom_code(rows)
+        # Sample a few rows from the test split to generate a table of predictions
+        # for visual inspection a.k.a. spot checking
+        # Randomly select indices for the samples
+        selected_indices = random.sample(range(test_split.num_rows), num_samples)
+        # Retrieve the selected samples from the dataset
+        test_split_list = list(test_split)
+        self.sample_split = []
+        for i in selected_indices:
+            self.sample_split.append(test_split_list[i])
+        self.sample_split = Dataset.from_list(self.sample_split)
 
-    def on_evaluate(self, args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
-        """Log the sample predictions and metrics to WANDB on eval callback."""
-        super().on_evaluate(args, state, control, **kwargs)
+    def initialize(self: "LLMSampleCB") -> None:
+        """Generate initial predictions for the sample split and log them to WANDB."""
+        self._wandb.init()
 
-        # Generate the table of sample predictions
-        records_table, metrics = self.samples_table_and_metrics()
+        _, (records_table, metrics) = self.batch_inference.run_initial_predictions(self.sample_split)
 
         # Log the table of sample predictions to W&B
         self._wandb.log({"sample_predictions": records_table})
 
         # Log the calculated metrics to W&B
         self._wandb.log(metrics)
+        print("LLMSampleCB initialized")
+
+    def on_evaluate(self, args: Any, state: Any, control: Any, **kwargs: dict[str, Any]) -> None:
+        """Log the sample predictions and metrics to WANDB on eval callback."""
+        super().on_evaluate(args, state, control, **kwargs)
+
+        # Generate the table of sample predictions
+        _, (records_table, metrics) = self.batch_inference.infer(self.sample_split)
+
+        # Log the table of sample predictions to W&B
+        self._wandb.log({"sample_predictions": records_table})
+
+        # Log the calculated metrics to W&B
+        self._wandb.log(metrics)
+
+
+def batch_inference(
+    batch_inference_split: Dataset,
+    model: AutoModelForCausalLM,
+    tokenizer: AutoTokenizer,
+    config: dict[str, Any],
+) -> None:
+    """Generate batch predictions."""
+    # Batch inference config
+    batch_inference = BatchInference(
+        model=model,
+        tokenizer=tokenizer,
+        format=config["batch_inference"]["dataset"].get("format", "text"),
+        run_tests_str=config.get("tests", ""),
+        run_metrics_str=config.get("metrics", ""),
+        max_new_tokens=config["batch_inference"]["generator"]["max_seq_length"],
+    )
+    predicted_rows, (records_table, metrics) = batch_inference.infer(batch_inference_split)
+    print(predicted_rows)
+    print(records_table)
+    print(metrics)
+
+    with TemporaryDirectory() as temp_dir:
+        temp_dir_path = Path(temp_dir)
+        # If you're creating a new dataset from scratch:
+        dataset_dict = DatasetDict(
+            {"predictions": Dataset.from_list(predicted_rows)}  # Assign the new dataset as the train split
+        )
+
+        short_name = config["batch_inference"]["dataset"]["name"].split("/")[-1] + "-output"
+        print(f"Converting {short_name} to dataset dict")
+
+        dataset_info = DatasetInfo(
+            description=f"Contains output for {short_name} from batch inference",
+            version="1.0.0",
+        )
+        for split, dataset in dataset_dict.items():
+            dataset.dataset_info = dataset_info
+        dataset_path = (temp_dir_path / short_name).as_posix()
+        dataset_dict.save_to_disk(dataset_path)
+
+        # Compress the folder
+        print(f"Compressing the folder {dataset_path}")
+        folder_to_compress = dataset_path
+        output_tar_file = f"{short_name}-output.tar.gz"
+        bucket_name = "fine-tuning-research"
+        print(f"Uploading {output_tar_file} to {bucket_name}")
+        dataset_mover = DatasetMover()
+        dataset_mover.upload(folder_to_compress, output_tar_file, bucket_name)
 
 
 def train(
@@ -465,30 +595,30 @@ def train(
         args=sft_config,
     )
 
-    # format = config["training"]["dataset"].get("format", "text")
-    # if test_split and test_split.num_rows > 0 and format == "completion":
-    #     # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
-    #     wandb_callback = LLMSampleCB(
-    #         trainer,
-    #         format,
-    #         test_split,
-    #         num_samples=100,
-    #         max_new_tokens=config["training"]["trainer"]["max_seq_length"],
-    #         run_tests_str=config.get("tests", ""),
-    #         run_metrics_str=config.get("metrics", ""),
-    #     )
-    #     wandb_callback.initialize()
-    #     trainer.add_callback(wandb_callback)
-
-    print("Starting training")
-    trainer.train()
+    format = config["training"]["dataset"].get("format", "text")
+    if test_split and test_split.num_rows > 0 and format == "completion":
+        # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
+        wandb_callback = LLMSampleCB(
+            trainer,
+            format,
+            test_split,
+            num_samples=100,
+            max_new_tokens=config["training"]["trainer"]["max_seq_length"],
+            run_tests_str=config.get("tests", ""),
+            run_metrics_str=config.get("metrics", ""),
+        )
+        wandb_callback.initialize()
+        trainer.add_callback(wandb_callback)
 
     # distributed training config
     if trainer.is_fsdp_enabled:
         trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
 
+    print("Starting training")
+    trainer.train()
+
     # if test_split and test_split.num_rows > 0:
-    #     trainer.evaluate(test_split)
+    #     trainer.predict(test_split)
 
 
 def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
@@ -519,24 +649,44 @@ def main() -> None:
     """Execute the main training loop."""
     dump_envs()
     config = load_config()
-    print("Loading model")
-    model, tokenizer = load_model(config)
-    print("Loading dataset")
-    train_split, val_split, test_split = fetch_dataset(
-        config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token
-    )
 
-    print("Starting training")
-    train(
-        train_split=train_split,
-        val_split=val_split,
-        test_split=test_split,
-        model=model,
-        tokenizer=tokenizer,
-        config=config,
-    )
-    print("Save and Uploading model..")
-    save_model(model, tokenizer, config)
+    # Check if "training" is in config or "batch_inference" is in config, but not both.
+    if "training" not in config and "batch_inference" not in config:
+        raise ValueError("Either 'training' or 'batch_inference' must be defined in the config")
+    elif "training" in config and "batch_inference" in config:
+        raise ValueError("Only one of 'training' or 'batch_inference' must be defined in the config")
+
+    if "training" in config:
+        print("Loading model")
+        training_config: dict[str, Any] = config["training"]
+        model, tokenizer = load_model(training_or_batch_inference_config=training_config)
+        print("Loading dataset")
+        dataset_dict = fetch_dataset(config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token)
+        print("Starting training")
+        train(
+            train_split=dataset_dict["train"],
+            val_split=dataset_dict.get("val", None),
+            test_split=dataset_dict.get("test", None),
+            model=model,
+            tokenizer=tokenizer,
+            config=config,
+        )
+        print("Save and Uploading model..")
+        save_model(model, tokenizer, config)
+    elif "batch_inference" in config:
+        print("Loading model")
+        batch_inference_config: dict[str, Any] = config["batch_inference"]
+        model, tokenizer = load_model(training_or_batch_inference_config=batch_inference_config)
+        print("Loading dataset")
+        dataset_dict = fetch_dataset(config=config, bos_token=tokenizer.bos_token, eos_token=tokenizer.eos_token)
+        print("Starting batch inference")
+        batch_inference(
+            batch_inference_split=dataset_dict["batch_inference"],
+            model=model,
+            tokenizer=tokenizer,
+            config=config,
+        )
+        print("Save and Uploading results..")
 
     finish()
 
