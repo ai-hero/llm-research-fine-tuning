@@ -565,27 +565,27 @@ def train(
         args=sft_config,
     )
 
-    # format = config["training"]["dataset"].get("format", "text")
-    # if test_split and test_split.num_rows > 0 and format == "completion":
-    #     # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
-    #     wandb_callback = LLMSampleCB(
-    #         trainer,
-    #         format,
-    #         test_split,
-    #         num_samples=100,
-    #         max_new_tokens=config["training"]["trainer"]["max_seq_length"],
-    #         run_tests_str=config.get("tests", ""),
-    #         run_metrics_str=config.get("metrics", ""),
-    #     )
-    #     wandb_callback.initialize()
-    #     trainer.add_callback(wandb_callback)
-
-    print("Starting training")
-    trainer.train()
+    format = config["training"]["dataset"].get("format", "text")
+    if test_split and test_split.num_rows > 0 and format == "completion":
+        # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
+        wandb_callback = LLMSampleCB(
+            trainer,
+            format,
+            test_split,
+            num_samples=100,
+            max_new_tokens=config["training"]["trainer"]["max_seq_length"],
+            run_tests_str=config.get("tests", ""),
+            run_metrics_str=config.get("metrics", ""),
+        )
+        wandb_callback.initialize()
+        trainer.add_callback(wandb_callback)
 
     # distributed training config
     if trainer.is_fsdp_enabled:
         trainer.accelerator.state.fsdp_plugin.set_state_dict_type("FULL_STATE_DICT")
+
+    print("Starting training")
+    trainer.train()
 
     # if test_split and test_split.num_rows > 0:
     #     trainer.predict(test_split)
