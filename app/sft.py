@@ -523,22 +523,22 @@ def batch_inference(
             {"predictions": Dataset.from_list(predicted_rows)}  # Assign the new dataset as the train split
         )
 
-        short_name = config["batch_inference"]["dataset"]["name"].split("/")[-1] + "-output"
-        print(f"Converting {short_name} to dataset dict")
+        output_short_name = config["batch_inference"]["dataset"]["name"].split("/")[-1] + "-output"
+        print(f"Converting {output_short_name} to dataset dict")
 
         dataset_info = DatasetInfo(
-            description=f"Contains output for {short_name} from batch inference",
+            description=f"Contains output for {output_short_name} from batch inference",
             version="1.0.0",
         )
         for split, dataset in dataset_dict.items():
             dataset.dataset_info = dataset_info
-        dataset_path = (temp_dir_path / short_name).as_posix()
+        dataset_path = (temp_dir_path / output_short_name).as_posix()
         dataset_dict.save_to_disk(dataset_path)
 
         # Compress the folder
         print(f"Compressing the folder {dataset_path}")
         folder_to_compress = dataset_path
-        output_tar_file = f"{short_name}-output.tar.gz"
+        output_tar_file = f"{output_short_name}.tar.gz"
         bucket_name = "fine-tuning-research"
         print(f"Uploading {output_tar_file} to {bucket_name}")
         dataset_mover = DatasetMover()
