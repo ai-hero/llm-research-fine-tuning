@@ -241,6 +241,9 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
                 training_or_batch_inference_config["model"]["base"]["name"],
                 quantization_config=bnb_config,
                 device_map=device_map,
+                trust_remote_code=True,
+                add_eos_token=False,
+                add_bos_token=False,
             )
             model.config.use_cache = False
             model.config.pretraining_tp = 1
@@ -250,6 +253,8 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
                 torch_dtype=torch.bfloat16,
                 use_cache=False,
                 trust_remote_code=True,
+                add_eos_token=False,
+                add_bos_token=False,
                 device_map=device_map,
             )
         tokenizer = AutoTokenizer.from_pretrained(
@@ -511,10 +516,7 @@ def batch_inference(
         run_metrics_str=config.get("metrics", ""),
         max_new_tokens=config["batch_inference"]["generator"]["max_seq_length"],
     )
-    predicted_rows, (records_table, metrics) = batch_inference.infer(batch_inference_split)
-    print(predicted_rows)
-    print(records_table)
-    print(metrics)
+    predicted_rows, (_, _) = batch_inference.infer(batch_inference_split)
 
     with TemporaryDirectory() as temp_dir:
         temp_dir_path = Path(temp_dir)
