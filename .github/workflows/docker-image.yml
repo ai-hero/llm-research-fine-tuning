@@ -2,7 +2,7 @@ name: Docker Image Creation
 on: [push]
 jobs:
   build:
-    runs-on: larger-runner-2
+    runs-on: large-runner
     timeout-minutes: 5
     steps:
       -
