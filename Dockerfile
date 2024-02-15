@@ -30,4 +30,5 @@ COPY src/aihero /home/user/src/aihero
 RUN pip install -e .
 
 # Run peft.py when the container launches
-CMD ["python", "/home/user/aihero/research/finetuning/sft.py"]
+WORKDIR /home/user/src/aihero/research/finetuning
+CMD ["python", "sft.py"]
