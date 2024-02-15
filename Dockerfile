@@ -36,4 +36,4 @@ COPY aihero /home/user/aihero
 WORKDIR /home/user/aihero
 
 # Run peft.py when the container launches
-CMD ["python", "sft.py"]
+CMD ["python", "/home/user/aihero/sft.py"]

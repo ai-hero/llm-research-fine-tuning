@@ -647,7 +647,7 @@ def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
         raise NotImplementedError("S3 support not implemented yet")
 
 
-def execute(config: dict[str, Any] = {}) -> None:
+def sft(config: dict[str, Any] = {}) -> None:
     """Execute the main training loop."""
     dump_envs()
     if not config:
@@ -695,4 +695,4 @@ def execute(config: dict[str, Any] = {}) -> None:
 
 
 if __name__ == "__main__":
-    Fire(execute)
+    Fire(sft)

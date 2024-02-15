@@ -6,7 +6,6 @@ authors = [
     "Rahul Parundekar <rahul@aihero.studio>",
     "Shankar Ganesan <gshankar.87@gmail.com>"
 ]
-readme = "README.md"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.7",

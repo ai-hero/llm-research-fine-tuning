@@ -1,4 +1,4 @@
 """Helps finetune models."""
-from .sft import execute
+from .sft import sft
 
-__all__ = ["execute"]
+__all__ = ["sft"]
