@@ -25,16 +25,9 @@ RUN pip install --upgrade pip build && \
     pip install -r requirements.txt && \
     pip install -r requirements-dev.txt
 
-
 COPY pyproject.toml /home/user/pyproject.toml
-COPY aihero /home/user/aihero
-
-# Set the working directory in the container to /aihero
-RUN python -m build
-
-
-# Make port 80 available to the world outside this container
-# EXPOSE 80
+COPY src/aihero /home/user/src/aihero
+RUN pip install -e .
 
 # Run peft.py when the container launches
 CMD ["python", "/home/user/aihero/research/finetuning/sft.py"]
