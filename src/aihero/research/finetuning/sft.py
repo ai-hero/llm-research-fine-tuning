@@ -16,7 +16,7 @@ from transformers.integrations import WandbCallback
 from trl import SFTTrainer
 from wandb import Table, finish
 
-from .utils import DatasetMover, dump_envs, load_config, peft_module_casting_to_bf16
+from aihero.research.finetuning.utils import DatasetMover, dump_envs, load_config, peft_module_casting_to_bf16
 
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
@@ -242,8 +242,6 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
                 quantization_config=bnb_config,
                 device_map=device_map,
                 trust_remote_code=True,
-                add_eos_token=False,
-                add_bos_token=False,
             )
             model.config.use_cache = False
             model.config.pretraining_tp = 1
@@ -253,12 +251,13 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
                 torch_dtype=torch.bfloat16,
                 use_cache=False,
                 trust_remote_code=True,
-                add_eos_token=False,
-                add_bos_token=False,
                 device_map=device_map,
             )
         tokenizer = AutoTokenizer.from_pretrained(
-            training_or_batch_inference_config["model"]["base"]["name"], trust_remote_code=True
+            training_or_batch_inference_config["model"]["base"]["name"],
+            trust_remote_code=True,
+            add_eos_token=False,
+            add_bos_token=False,
         )
         # May need to have some custom padding logic here
         special_tokens = {"pad_token": "[PAD]"}
@@ -647,7 +646,7 @@ def save_model(model: Any, tokenizer: Any, config: dict[str, Any]) -> None:
         raise NotImplementedError("S3 support not implemented yet")
 
 
-def execute(config: dict[str, Any] = {}) -> None:
+def sft(config: dict[str, Any] = {}) -> None:
     """Execute the main training loop."""
     dump_envs()
     if not config:
@@ -695,4 +694,4 @@ def execute(config: dict[str, Any] = {}) -> None:
 
 
 if __name__ == "__main__":
-    Fire(execute)
+    Fire(sft)

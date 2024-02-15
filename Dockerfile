@@ -15,22 +15,20 @@ RUN apt-get update \
     && apt-get clean autoremove --yes \
     && rm -rf /var/lib/{apt,dpkg,cache,log}
 
-# Copy the current directory contents into the container at /app
-COPY src/finetuningresearch/requirements.txt requirements.txt
+# Copy the current directory contents into the container
+COPY requirements.txt /home/user/requirements.txt
+COPY requirements-dev.txt /home/user/requirements-dev.txt
 
+WORKDIR /home/user
 # Install any needed packages specified in requirements.txt
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt && \
-    rm requirements.txt
+RUN pip install --upgrade pip build && \
+    pip install -r requirements.txt && \
+    pip install -r requirements-dev.txt
 
-COPY src/finetuningresearch /app
-
-# Set the working directory in the container to /app
-WORKDIR /app
-
-
-# Make port 80 available to the world outside this container
-# EXPOSE 80
+COPY pyproject.toml /home/user/pyproject.toml
+COPY src/aihero /home/user/src/aihero
+RUN pip install -e .
 
 # Run peft.py when the container launches
+WORKDIR /home/user/src/aihero/research/finetuning
 CMD ["python", "sft.py"]

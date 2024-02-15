@@ -1,11 +1,17 @@
-# Code QA
+transformers==4.36.1
+peft==0.7.1
+bitsandbytes==0.41.3.post2
+accelerate==0.25.0
+trl==0.7.7
+pydantic-settings==2.0.3
+scipy==1.11.3
+PyYAML==6.0.1
+datasets==2.14.6
+einops==0.7.0
+wandb==0.15.12
 python-dotenv
-black
-mypy
-ruff
-pytest
-blacken-docs
-pyupgrade
-detect-secrets
-tomli
-pre-commit
+minio==7.2.0
+fire
+types-PyYAML
+scikit-learn
+numpy

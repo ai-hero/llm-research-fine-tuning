@@ -1,7 +1,7 @@
 [project]
-name = "finetuningresearch"
-version = "0.1.0"
-description = "Open source research on fine-tuning LLMs"
+name = "aihero-finetuning-research"
+version = "0.2.0"
+description = "Framework for open source research on fine-tuning LLMs"
 authors = [
     {name = "Rahul Parundekar", email= "rahul@aihero.studio" },
     {name = "Shankar Ganesan", email = "gshankar.87@gmail.com" }
@@ -14,27 +14,19 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
 ]
-dependencies = [
-    "transformers>=4.35.0",
-    "peft>=0.5.0",
-    "bitsandbytes>=0.41.1",
-    "accelerate>=0.25.0",
-    "trl>=0.7.2",
-    "pydantic-settings>=2.0.3",
-    "scipy>=1.11.3",
-    "PyYAML>=6.0.1",
-    "datasets>=2.14.6",
-    "einops>=0.7.0",
-    "wandb>=0.15.12",
-    "python-dotenv",
-    "minio>=7.2.0",
-    "fire",
-    "types-PyYAML"
-]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+optional-dependencies = {dev = { file = ["requirements-dev.txt"] }}
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [tool.pytest.ini_options]
 addopts = "-vvv"
-testpaths = "tests"
+testpaths = "src/tests"
 
 [tool.black]
 line_length = 120
@@ -58,9 +50,9 @@ select = [
     "I",
     "W",
 ]
-src = ["app", "tests"]
+src = ["src/aihero", "src/tests"]
 
 [mypy]
-files = ["app", "k8s"]
+files = ["src/aihero"]
 strict_optional = false
 warn_unused_ignores = false

@@ -31,5 +31,3 @@ jobs:
           context: .
           push: true
           tags: rparundekar/fine_tune_research:${{ env.SHORT_SHA }}
-          cache-from: type=registry,ref=rparundekar/fine_tune_research:latest
-          cache-to: type=inline
