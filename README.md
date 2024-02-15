@@ -20,20 +20,5 @@ docker build . -t rparundekar/fine_tune_research:20230110_01
 docker push rparundekar/fine_tune_research:20230110_01
 ```
 
-## Library
-To use this finetuning library as a python package, perform a pip install directly from github. This should install all dependencies as well.
-
-```sh
-pip install -v git+https://github.com/ai-hero/llm-research-fine-tuning@main
-```
-
-then use it normally in your python code.
-
-```python
-from aihero.research.finetuning import sft
-
-config = """
-<config multiline yaml here>
-"""
-sft(config)
-```
+## Launching a Job
+Please see the launch instructions in the `llm-research-fine-tuning` project.
