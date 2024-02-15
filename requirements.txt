@@ -9,6 +9,7 @@ PyYAML>=6.0.1
 datasets>=2.14.6
 einops>=0.7.0
 wandb>=0.15.12
+ibis-framework==2.1.0
 python-dotenv
 minio>=7.2.0
 fire
