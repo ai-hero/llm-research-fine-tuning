@@ -242,8 +242,6 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
                 quantization_config=bnb_config,
                 device_map=device_map,
                 trust_remote_code=True,
-                add_eos_token=False,
-                add_bos_token=False,
             )
             model.config.use_cache = False
             model.config.pretraining_tp = 1
@@ -253,12 +251,13 @@ def load_model(training_or_batch_inference_config: dict[str, Any]) -> Tuple[Auto
                 torch_dtype=torch.bfloat16,
                 use_cache=False,
                 trust_remote_code=True,
-                add_eos_token=False,
-                add_bos_token=False,
                 device_map=device_map,
             )
         tokenizer = AutoTokenizer.from_pretrained(
-            training_or_batch_inference_config["model"]["base"]["name"], trust_remote_code=True
+            training_or_batch_inference_config["model"]["base"]["name"],
+            trust_remote_code=True,
+            add_eos_token=False,
+            add_bos_token=False,
         )
         # May need to have some custom padding logic here
         special_tokens = {"pad_token": "[PAD]"}
