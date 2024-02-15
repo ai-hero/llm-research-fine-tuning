@@ -20,8 +20,8 @@ RUN pip install --upgrade pip && \
     pip install "poetry==1.1.13"
 
 # Copy only the files necessary for Poetry to install dependencies
-COPY aihero/finetuningresearch/pyproject.toml ./pyproject.toml
-COPY aihero/finetuningresearch/poetry.lock ./poetry.lock
+COPY pyproject.toml ./pyproject.toml
+COPY poetry.lock ./poetry.lock
 
 # Configure Poetry
 # Disable virtualenv creation by Poetry since Docker itself provides isolation
