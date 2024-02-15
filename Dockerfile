@@ -15,27 +15,26 @@ RUN apt-get update \
     && apt-get clean autoremove --yes \
     && rm -rf /var/lib/{apt,dpkg,cache,log}
 
-# Install Poetry
-RUN pip install --upgrade pip && \
-    pip install poetry
-
-# Copy only the files necessary for Poetry to install dependencies
-COPY pyproject.toml /home/user/pyproject.toml
-COPY poetry.lock /home/user/poetry.lock
-
-# Configure Poetry
-# Disable virtualenv creation by Poetry since Docker itself provides isolation
-RUN poetry config virtualenvs.create false
+# Copy the current directory contents into the container
+COPY requirements.txt /home/user/requirements.txt
+COPY requirements-dev.txt /home/user/requirements-dev.txt
 
 WORKDIR /home/user
+# Install any needed packages specified in requirements.txt
+RUN pip install --upgrade pip build && \
+    pip install -r requirements.txt && \
+    pip install -r requirements-dev.txt
 
-# Install the project dependencies
-RUN poetry install --no-dev
 
+COPY pyproject.toml /home/user/pyproject.toml
 COPY aihero /home/user/aihero
 
 # Set the working directory in the container to /aihero
-WORKDIR /home/user/aihero
+RUN python -m build
 
-# Run sft.py when the container launches
-CMD ["python", "/home/user/aihero/sft.py"]
+
+# Make port 80 available to the world outside this container
+# EXPOSE 80
+
+# Run peft.py when the container launches
+CMD ["python", "/home/user/aihero/research/finetuning/sft.py"]
