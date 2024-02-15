@@ -30,10 +30,10 @@ pip install -v git+https://github.com/ai-hero/llm-research-fine-tuning@main
 then use it normally in your python code.
 
 ```python
-from finetuningresearch import execute
+from aihero.research.finetuning import sft
 
 config = """
 <config multiline yaml here>
 """
-execute(config)
+sft(config)
 ```

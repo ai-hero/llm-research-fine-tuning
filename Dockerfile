@@ -27,6 +27,8 @@ COPY poetry.lock /home/user/poetry.lock
 # Disable virtualenv creation by Poetry since Docker itself provides isolation
 RUN poetry config virtualenvs.create false
 
+WORKDIR /home/user
+
 # Install the project dependencies
 RUN poetry install --no-dev
 
@@ -35,5 +37,5 @@ COPY aihero /home/user/aihero
 # Set the working directory in the container to /aihero
 WORKDIR /home/user/aihero
 
-# Run peft.py when the container launches
+# Run sft.py when the container launches
 CMD ["python", "/home/user/aihero/sft.py"]
