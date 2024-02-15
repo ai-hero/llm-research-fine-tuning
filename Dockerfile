@@ -20,8 +20,8 @@ RUN pip install --upgrade pip && \
     pip install poetry
 
 # Copy only the files necessary for Poetry to install dependencies
-COPY pyproject.toml ./pyproject.toml
-COPY poetry.lock ./poetry.lock
+COPY pyproject.toml /home/user/pyproject.toml
+COPY poetry.lock /home/user/poetry.lock
 
 # Configure Poetry
 # Disable virtualenv creation by Poetry since Docker itself provides isolation
@@ -30,10 +30,10 @@ RUN poetry config virtualenvs.create false
 # Install the project dependencies
 RUN poetry install --no-dev
 
-COPY aihero /aihero
+COPY aihero /home/user/aihero
 
 # Set the working directory in the container to /aihero
-WORKDIR /aihero
+WORKDIR /home/user/aihero
 
 # Run peft.py when the container launches
 CMD ["python", "sft.py"]
