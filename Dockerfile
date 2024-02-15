@@ -17,7 +17,7 @@ RUN apt-get update \
 
 # Install Poetry
 RUN pip install --upgrade pip && \
-    pip install "poetry==1.1.13"
+    pip install poetry
 
 # Copy only the files necessary for Poetry to install dependencies
 COPY pyproject.toml ./pyproject.toml
