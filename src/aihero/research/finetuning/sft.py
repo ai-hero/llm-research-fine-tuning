@@ -7,7 +7,6 @@ from typing import Any, Generator, Tuple
 
 import torch
 from datasets import Dataset, DatasetDict, DatasetInfo, load_dataset, load_from_disk
-from fire import Fire
 from huggingface_hub import login
 from peft import LoraConfig, get_peft_model
 from tqdm import tqdm
@@ -691,7 +690,3 @@ def sft(config: dict[str, Any] = {}) -> None:
         print("Save and Uploading results..")
 
     finish()
-
-
-if __name__ == "__main__":
-    Fire(sft)

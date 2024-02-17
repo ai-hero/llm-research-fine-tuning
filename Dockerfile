@@ -29,6 +29,6 @@ COPY pyproject.toml /home/user/pyproject.toml
 COPY src/aihero /home/user/src/aihero
 RUN pip install -e .
 
-# Run peft.py when the container launches
-WORKDIR /home/user/src/aihero/research/finetuning
-CMD ["python", "sft.py"]
+# Run launch.py when the container launches
+COPY launch.py /home/user/
+CMD ["python", "launch.py"]

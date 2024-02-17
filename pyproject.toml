@@ -1,5 +1,5 @@
 [project]
-name = "aihero-finetuning-research"
+name = "aihero-research-finetuning"
 version = "0.2.0"
 description = "Framework for open source research on fine-tuning LLMs"
 authors = [
