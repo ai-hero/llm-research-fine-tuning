@@ -5,13 +5,13 @@ from aihero.research.finetuning.train import TrainingJobRunner
 from fire import Fire
 
 
-def train(training_config_file: str) -> None:
+def train(training_config_file: str = "/mnt/config/inference/config.yaml") -> None:
     """Run Training."""
     training_config = TrainingJob.load(training_config_file)
     TrainingJobRunner(training_config).run()
 
 
-def infer(batch_inference_config_file: str) -> None:
+def infer(batch_inference_config_file: str = "/mnt/config/training/config.yaml") -> None:
     """Run Batch Inference."""
     batch_inference_config = BatchInferenceJob.load(batch_inference_config_file)
     BatchInferenceJobRunner(batch_inference_config).run()

@@ -10,7 +10,6 @@ from peft.tuners.lora import LoraLayer
 from transformers import AutoModelForCausalLM
 
 DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
-MOUNTED_CONFIG_PATH = "/mnt/config/training/config.yaml"
 
 
 class DatasetMover:
