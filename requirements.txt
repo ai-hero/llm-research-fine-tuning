@@ -1,5 +1,5 @@
 # Base
-git+https://github.com/ai-hero/llm-research-config.git@main
+git+https://github.com/ai-hero/llm-research-config.git@main#egg=aihero-research-finetuning
 
 # Training related
 transformers==4.36.1
