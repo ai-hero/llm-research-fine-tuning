@@ -15,10 +15,6 @@ RUN apt-get update \
     && apt-get clean autoremove --yes \
     && rm -rf /var/lib/{apt,dpkg,cache,log}
 
-# Copy the current directory contents into the container
-COPY requirements.txt /home/user/requirements.txt
-COPY requirements-dev.txt /home/user/requirements-dev.txt
-
 WORKDIR /home/user
 # Install any needed packages specified in requirements.txt
 RUN pip install --upgrade pip build
