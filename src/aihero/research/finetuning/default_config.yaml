@@ -4,13 +4,13 @@ project:
 training:
   model:
     base:
-      type: "hf"
+      type: "huggingface"
       name: "meta-llama/Llama-2-7b-hf"
     output:
-      type: "hf"
+      type: "huggingface"
       name: "rparundekar/llama2-7b-guanaco"
   dataset:
-    type: "hf"
+    type: "huggingface"
     name: "mlabonne/guanaco-llama2-1k"
     format: "text"
   trainer:

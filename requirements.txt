@@ -13,9 +13,9 @@ PyYAML==6.0.1
 datasets==2.14.6
 einops==0.7.0
 wandb==0.15.12
-python-dotenv
+python-dotenv==1.0.1
 minio==7.2.0
-fire
-types-PyYAML
-scikit-learn
-numpy
+fire==0.5.0
+types-PyYAML==6.0.12.12
+scikit-learn==1.4.0
+numpy==1.26.4
