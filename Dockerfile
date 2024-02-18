@@ -22,12 +22,12 @@ COPY requirements-dev.txt /home/user/requirements-dev.txt
 WORKDIR /home/user
 # Install any needed packages specified in requirements.txt
 RUN pip install --upgrade pip build && \
-    pip install -r requirements.txt && \
-    pip install -r requirements-dev.txt
+    pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-dev.txt
 
 COPY pyproject.toml /home/user/pyproject.toml
 COPY src/aihero /home/user/src/aihero
-RUN pip install -e .
+RUN pip install --no-cache-dir .
 
 # Run launch.py when the container launches
 COPY launch.py /home/user/
