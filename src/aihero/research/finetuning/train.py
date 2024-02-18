@@ -158,9 +158,9 @@ class TrainingJobRunner:
             # If the dataset is s3, download it to the local directory
             # The path would look like bucket_name/path/to/dataset_name.tar.gz
             # local_name would then be = path/to/dataset_name.tar.gz
-            local_name = self.training_job.dataset.type[self.training_job.dataset.type.find("/") + 1 :]
+            local_name = self.training_job.dataset.name[self.training_job.dataset.name.find("/") + 1 :]
             dataset_mover.download(
-                bucket_name=self.training_job.dataset.type.split("/")[0],
+                bucket_name=self.training_job.dataset.name.split("/")[0],
                 object_name=f"{local_name}.tar.gz",
                 output_folder_path=DATASET_DIR,
             )
