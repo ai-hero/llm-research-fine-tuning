@@ -14,11 +14,45 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
 ]
-dynamic = ["dependencies"]
+dependencies = [
+    "accelerate==0.25.0",
+    "aihero-research-config @ git+https://github.com/ai-hero/llm-research-config.git@main#egg=aihero-research-config",
+    "bitsandbytes==0.41.3.post2",
+    "datasets==2.14.6",
+    "einops==0.7.0",
+    "fire==0.5.0",
+    "minio==7.2.0",
+    "numpy==1.26.4",
+    "peft==0.7.1",
+    "pydantic-settings==2.0.3",
+    "python-dotenv==1.0.1",
+    "PyYAML==6.0.1",
+    "scikit-learn==1.4.0",
+    "scipy==1.11.3",
+    "transformers==4.36.1",
+    "trl==0.7.7",
+    "types-PyYAML==6.0.12.12",
+    "wandb==0.15.12",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.2.5",
+    "black>=22.3",
+    "mypy>=0.910",
+    "ruff>=0.0.79",
+    "blacken-docs>=1.11.0",
+    "pyupgrade>=2.29.1",
+    "detect-secrets>=1.2.0",
+    "tomli>=1.2.3",
+    "pre-commit>=2.17.0",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+
 
 [tool.pytest.ini_options]
 addopts = "-vvv"

@@ -301,6 +301,14 @@ class TrainingJobRunner:
         )
 
         task = self.training_job.dataset.task
+        if self.training_job.eval and self.training_job.eval.tests:
+            run_tests_str = self.training_job.eval.tests
+        else:
+            run_tests_str = ""
+        if self.training_job.eval and self.training_job.eval.metrics:
+            run_metrics_str = self.training_job.eval.metrics
+        else:
+            run_metrics_str = ""
         if test_split and test_split.num_rows > 0 and task == "completion":
             # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
             wandb_callback = LLMSampleCB(
@@ -309,8 +317,8 @@ class TrainingJobRunner:
                 test_split,
                 num_samples=100,
                 max_new_tokens=self.training_job.trainer.max_seq_length,
-                run_tests_str=self.training_job.eval.tests,
-                run_metrics_str=self.training_job.eval.metrics,
+                run_tests_str=run_tests_str,
+                run_metrics_str=run_metrics_str,
             )
             wandb_callback.initialize()
             trainer.add_callback(wandb_callback)
