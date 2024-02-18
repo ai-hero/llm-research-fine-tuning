@@ -15,20 +15,14 @@ RUN apt-get update \
     && apt-get clean autoremove --yes \
     && rm -rf /var/lib/{apt,dpkg,cache,log}
 
-# Copy the current directory contents into the container
-COPY requirements.txt /home/user/requirements.txt
-COPY requirements-dev.txt /home/user/requirements-dev.txt
-
 WORKDIR /home/user
 # Install any needed packages specified in requirements.txt
-RUN pip install --upgrade pip build && \
-    pip install -r requirements.txt && \
-    pip install -r requirements-dev.txt
+RUN pip install --upgrade pip build
 
 COPY pyproject.toml /home/user/pyproject.toml
 COPY src/aihero /home/user/src/aihero
-RUN pip install -e .
+RUN pip install .
 
-# Run peft.py when the container launches
-WORKDIR /home/user/src/aihero/research/finetuning
-CMD ["python", "sft.py"]
+# Run launch.py when the container launches
+COPY launch.py /home/user/
+CMD ["python", "launch.py"]
