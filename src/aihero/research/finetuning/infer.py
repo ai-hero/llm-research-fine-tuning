@@ -42,7 +42,7 @@ class BatchInferenceJobRunner:
         else:
             run_tests_str = ""
             run_metrics_str = ""
-            size = 100
+            size = 0
             randomize = False
 
         self.batch_inference_split = self.dataset_dict["batch_inference"]
