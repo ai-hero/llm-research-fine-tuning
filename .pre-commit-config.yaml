@@ -35,6 +35,8 @@ repos:
     hooks:
       - id: mypy
         args: [--strict, --ignore-missing-imports]
+        additional_dependencies:
+        - "pydantic>=1.10.4"
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     # Ruff version.
