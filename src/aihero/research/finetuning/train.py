@@ -5,8 +5,8 @@ from typing import Any, Optional, Tuple
 import torch
 from datasets import Dataset, DatasetDict
 from huggingface_hub import login
-from peft import get_peft_model
-from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TrainingArguments
 from trl import SFTTrainer
 from wandb import finish
 
@@ -274,17 +274,20 @@ class TrainingJobRunner:
         assert self.training_job.sft.max_steps, "max_steps must be defined"
 
         # SFT training config
-        self.training_job.sft.save_total_limit = 2
-        self.training_job.sft.save_strategy = "steps"
-        self.training_job.sft.load_best_model_at_end = True
-        self.training_job.sft.output_dir = CHECKPOINT_DIR
+        training_arguments_dict = self.training_job.sft.model_dump()
+        training_arguments_dict["save_total_limit"] = 2
+        training_arguments_dict["save_strategy"] = "steps"
+        training_arguments_dict["load_best_model_at_end"] = True
+        training_arguments_dict["output_dir"] = CHECKPOINT_DIR
+        training_arguments = TrainingArguments(**training_arguments_dict)
         # PEFT training config
         if self.training_job.peft:
-            model = get_peft_model(self.model, self.training_job.peft)
+            lora_config = LoraConfig(**self.training_job.peft.model_dump())
+            model = get_peft_model(self.model, lora_config)
             if self.training_job.peft.bf16:
-                peft_module_casting_to_bf16(model, self.training_job.peft)
+                peft_module_casting_to_bf16(model, self.training_job.peft.model_dump())
             model.print_trainable_parameters()
-            self.training_job.sft.peft_config = self.training_job.peft
+            self.training_job.sft.peft_config = lora_config
             self.training_job.sft.n_freeze = "all"
         elif self.training_job.freeze:
             self.freeze()
@@ -299,7 +302,7 @@ class TrainingJobRunner:
             dataset_text_field="text",
             max_seq_length=self.training_job.trainer.max_seq_length,
             packing=self.training_job.trainer.packing,  # Should you combine multiple examples into one sequence?
-            args=self.training_job.sft,
+            args=training_arguments,
         )
 
         task = self.training_job.dataset.task
