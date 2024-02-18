@@ -1,1 +1,1 @@
-"""Helps finetune models."""
+"""Module `aihero.research.finetuning`."""
