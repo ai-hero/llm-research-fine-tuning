@@ -25,7 +25,7 @@ RUN pip install --upgrade pip build
 
 COPY pyproject.toml /home/user/pyproject.toml
 COPY src/aihero /home/user/src/aihero
-RUN pip install --no-cache-dir .
+RUN pip install .
 
 # Run launch.py when the container launches
 COPY launch.py /home/user/
