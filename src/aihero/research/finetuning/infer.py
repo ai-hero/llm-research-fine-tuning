@@ -40,6 +40,8 @@ class BatchInferenceJobRunner:
             size = self.batch_inference_job.size or 100
             randomize = self.batch_inference_job.randomize or False
         else:
+            run_tests_str = self.batch_inference_job.tests or ""
+            run_metrics_str = self.batch_inference_job.metrics or ""
             size = 100
             randomize = False
 
