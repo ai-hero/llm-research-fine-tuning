@@ -122,7 +122,6 @@ class BatchInferenceJobRunner:
             tokenizer.padding_side = "right"
             model.config.pad_token_id = tokenizer.pad_token_id
             model.resize_token_embeddings(len(tokenizer))
-
         elif self.batch_inference_job.model.type == "s3":
             # TODO : Add s3 support
             raise NotImplementedError("S3 support not implemented yet")
