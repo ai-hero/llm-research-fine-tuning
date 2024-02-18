@@ -21,9 +21,7 @@ COPY requirements-dev.txt /home/user/requirements-dev.txt
 
 WORKDIR /home/user
 # Install any needed packages specified in requirements.txt
-RUN pip install --upgrade pip build && \
-    pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r requirements-dev.txt
+RUN pip install --upgrade pip build
 
 COPY pyproject.toml /home/user/pyproject.toml
 COPY src/aihero /home/user/src/aihero
