@@ -9,8 +9,6 @@ from minio import Minio, S3Error
 from peft.tuners.lora import LoraLayer
 from transformers import AutoModelForCausalLM
 
-DEFAULT_STATIC_CONFIG_PATH = "./default_config.yaml"
-
 
 class DatasetMover:
     """Utility class for uploading and downloading files from S3."""

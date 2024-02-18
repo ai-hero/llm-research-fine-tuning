@@ -268,11 +268,6 @@ class TrainingJobRunner:
         val_split = self.dataset_dict.get("val", None)
         test_split = self.dataset_dict.get("test", None)
 
-        # Calculate max steps from num epochs
-        if self.training_job.sft.num_train_epochs:
-            raise ValueError("num_train_epochs is not supported, use max_steps instead")
-        assert self.training_job.sft.max_steps, "max_steps must be defined"
-
         # SFT training config
         training_arguments_dict = self.training_job.sft.model_dump()
         training_arguments_dict["save_total_limit"] = 2
