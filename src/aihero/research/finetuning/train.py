@@ -323,8 +323,8 @@ class TrainingJobRunner:
             if self.training_job.sft.bf16:
                 peft_module_casting_to_bf16(model, self.training_job.peft.model_dump())
             model.print_trainable_parameters()
-            self.training_job.sft.peft_config = lora_config
-            self.training_job.sft.n_freeze = "all"
+            peft_config = lora_config
+            # self.training_job.sft.n_freeze = "all"
         elif self.training_job.freeze:
             self.freeze()
             peft_config = None
