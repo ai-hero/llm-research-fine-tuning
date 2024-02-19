@@ -1,6 +1,6 @@
 [project]
 name = "aihero-research-finetuning"
-version = "0.3.1"
+version = "0.3.2"
 description = "Framework for open source research on fine-tuning LLMs"
 authors = [
     {name = "Rahul Parundekar", email= "rahul@aihero.studio" },
