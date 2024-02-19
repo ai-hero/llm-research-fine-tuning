@@ -320,7 +320,7 @@ class TrainingJobRunner:
         if self.training_job.peft:
             lora_config = LoraConfig(**self.training_job.peft.model_dump())
             model = get_peft_model(self.model, lora_config)
-            if self.training_job.peft.bf16:
+            if self.training_job.sft.bf16:
                 peft_module_casting_to_bf16(model, self.training_job.peft.model_dump())
             model.print_trainable_parameters()
             self.training_job.sft.peft_config = lora_config
