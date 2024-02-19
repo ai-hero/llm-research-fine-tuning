@@ -205,6 +205,47 @@ class TrainingJobRunner:
                 )
             except:  # pylint: disable=bare-except  # noqa: E722
                 print("Unable to create test dataset")
+        elif self.training_job.dataset.type == "local":
+            print("Loading dataset locally: ", os.listdir(self.training_job.dataset.path))
+            splits["train"] = Dataset.from_generator(
+                dataset_generator,
+                gen_kwargs={
+                    "dataset": self.training_job.dataset.path,
+                    "split": "train",
+                    "from_disk": True,
+                    "task": self.training_job.task,
+                    "bos_token": bos_token,
+                    "eos_token": eos_token,
+                },
+            )
+            try:
+                splits["val"] = Dataset.from_generator(
+                    dataset_generator,
+                    gen_kwargs={
+                        "dataset": self.training_job.dataset.path,
+                        "split": "val",
+                        "from_disk": True,
+                        "task": self.training_job.task,
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+            except:  # pylint: disable=bare-except  # noqa: E722
+                print("Unable to create val dataset")
+            try:
+                splits["test"] = Dataset.from_generator(
+                    dataset_generator,
+                    gen_kwargs={
+                        "dataset": self.training_job.dataset.path,
+                        "split": "test",
+                        "from_disk": True,
+                        "task": self.training_job.task,
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+            except:  # pylint: disable=bare-except  # noqa: E722
+                print("Unable to create test dataset")
         else:
             raise ValueError(f"Unknown dataset_type: {self.training_job.dataset.type}")
 
