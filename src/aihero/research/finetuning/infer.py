@@ -50,15 +50,14 @@ class BatchInferenceJobRunner:
             if randomize:
                 self.batch_inference_split = self.batch_inference_split.shuffle()
             self.batch_inference_split = self.batch_inference_split.select(range(size))
-
-        self.batch_inference_with_eval = BatchInferenceWithEval(
-            model=self.model,
-            tokenizer=self.tokenizer,
-            task=self.batch_inference_job.task,
-            run_tests_str=run_tests_str,
-            run_metrics_str=run_metrics_str,
-            max_new_tokens=self.batch_inference_job.generator.max_seq_length or MAX_NEW_TOKENS,
-        )
+            self.batch_inference_with_eval = BatchInferenceWithEval(
+                model=self.model,
+                tokenizer=self.tokenizer,
+                task=self.batch_inference_job.task,
+                run_tests_str=run_tests_str,
+                run_metrics_str=run_metrics_str,
+                max_new_tokens=self.batch_inference_job.generator.max_seq_length or MAX_NEW_TOKENS,
+            )
 
     def load_model(self) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
         """Load the model from HuggingFace Hub or S3."""
@@ -220,6 +219,8 @@ class BatchInferenceJobRunner:
 
     def infer_on_dataset(self) -> None:
         """Generate batch predictions."""
+        if not self.batch_inference_with_eval:
+            return
         # Batch inference config
         predicted_rows, (_, _) = self.batch_inference_with_eval.infer(self.batch_inference_split)
 
