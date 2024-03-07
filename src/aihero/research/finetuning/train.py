@@ -364,8 +364,6 @@ class TrainingJobRunner:
                 )
                 wandb_callback.initialize()
                 trainer.add_callback(wandb_callback)
-            else:
-                os.environ["WANDB_MODE"] == "offline"
 
         # distributed training config
         if trainer.is_fsdp_enabled:
