@@ -351,18 +351,21 @@ class TrainingJobRunner:
         else:
             run_metrics_str = ""
         if test_split and test_split.num_rows > 0 and task == "completion":
-            # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
-            wandb_callback = LLMSampleCB(
-                trainer,
-                task,
-                test_split,
-                num_samples=100,
-                max_new_tokens=self.training_job.trainer.max_seq_length,
-                run_tests_str=run_tests_str,
-                run_metrics_str=run_metrics_str,
-            )
-            wandb_callback.initialize()
-            trainer.add_callback(wandb_callback)
+            if os.environ.get("WANDB_API_KEY", None):
+                # we instantiate the W&B callback with the trainer object and the dataset we want to sample from
+                wandb_callback = LLMSampleCB(
+                    trainer,
+                    task,
+                    test_split,
+                    num_samples=100,
+                    max_new_tokens=self.training_job.trainer.max_seq_length,
+                    run_tests_str=run_tests_str,
+                    run_metrics_str=run_metrics_str,
+                )
+                wandb_callback.initialize()
+                trainer.add_callback(wandb_callback)
+            else:
+                os.environ["WANDB_MODE"] == "offline"
 
         # distributed training config
         if trainer.is_fsdp_enabled:
