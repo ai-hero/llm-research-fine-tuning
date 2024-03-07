@@ -379,6 +379,6 @@ class TrainingJobRunner:
         """Execute the main training loop."""
         print("Starting training")
         self.train()
-        print("Save and Uploading model..")
+        print("Saving model..")
         self.save_model()
         finish()
