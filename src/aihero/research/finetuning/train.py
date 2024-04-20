@@ -316,7 +316,7 @@ class TrainingJobRunner:
         # SFT training config
         training_arguments_dict = self.training_job.sft.model_dump()
         training_arguments_dict["save_total_limit"] = 2
-        training_arguments_dict["save_strategy"] = "steps"
+        training_arguments_dict["save_strategy"] = self.training_job.sft.evaluation_strategy
         training_arguments_dict["load_best_model_at_end"] = True
         training_arguments_dict["output_dir"] = CHECKPOINT_DIR
         training_arguments = TrainingArguments(**training_arguments_dict)
