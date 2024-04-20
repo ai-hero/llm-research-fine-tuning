@@ -311,6 +311,7 @@ class TrainingJobRunner:
 
         if not val_split:
             assert not self.training_job.sft.eval_steps, "Eval steps should be 0 if no validation set is provided"
+            self.training_job.sft.evaluation_strategy = "no"
 
         # SFT training config
         training_arguments_dict = self.training_job.sft.model_dump()
