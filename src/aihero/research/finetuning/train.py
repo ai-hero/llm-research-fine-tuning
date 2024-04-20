@@ -309,6 +309,9 @@ class TrainingJobRunner:
         val_split = self.dataset_dict.get("val", None)
         test_split = self.dataset_dict.get("test", None)
 
+        if not val_split:
+            assert not self.training_job.sft.eval_steps, "Eval steps should be 0 if no validation set is provided"
+
         # SFT training config
         training_arguments_dict = self.training_job.sft.model_dump()
         training_arguments_dict["save_total_limit"] = 2
