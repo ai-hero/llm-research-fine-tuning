@@ -18,6 +18,7 @@ CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
 
 if os.environ.get("HF_TOKEN", None):
+    print("Logging in to HuggingFace Hub")
     login(token=os.environ["HF_TOKEN"])
 
 
