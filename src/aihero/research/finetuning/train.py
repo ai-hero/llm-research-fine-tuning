@@ -1,6 +1,7 @@
 """Launch the training job inside a container."""
 import os
 import time
+import traceback
 from typing import Any, Tuple
 
 import torch
@@ -282,9 +283,12 @@ class TrainingJobRunner:
             os.remove(f"{DATASET_DIR}/downloading_data.txt")
             return DatasetDict(splits)
         except:  # pylint: disable=bare-except  # noqa: E722
+            traceback.print_exc()
+            os.remove(f"{DATASET_DIR}/downloading_data.txt")
             print("Unable to load dataset")
             with open(f"{DATASET_DIR}/data_abort.txt", "w") as f:
                 f.write("Data Abort")
+            raise Exception("Data Abort")
 
     def freeze(self) -> None:
         """Freeze the model layers for SFT without PEFT."""
