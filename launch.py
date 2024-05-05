@@ -9,8 +9,8 @@ from fire import Fire
 
 def train(training_config_file: str = "/mnt/config/training/config.yaml") -> None:
     """Run Training."""
-    training_config = TrainingJob.load(training_config_file, is_distributed=int(os.getenv("WORLD_SIZE", 1)) > 1)
-    TrainingJobRunner(training_config).run()
+    training_config = TrainingJob.load(training_config_file)
+    TrainingJobRunner(training_config, is_distributed=int(os.getenv("WORLD_SIZE", 1)) > 1).run()
 
 
 def infer(batch_inference_config_file: str = "/mnt/config/batch_inference/config.yaml") -> None:
