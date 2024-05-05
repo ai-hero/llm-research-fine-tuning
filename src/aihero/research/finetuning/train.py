@@ -1,5 +1,6 @@
 """Launch the training job inside a container."""
 import os
+import time
 from typing import Any, Tuple
 
 import torch
@@ -29,10 +30,20 @@ class TrainingJobRunner:
         """Initialize the training job runner."""
         self.training_job = training_job
         self.is_distributed = is_distributed
-        print("Loading model")
-        self.model, self.tokenizer = self.load_model()
+        print("Is Distributed: ", self.is_distributed)
+        if self.is_distributed:
+            backend = "nccl" if torch.cuda.is_available() else "gloo"
+            import torch.distributed as dist
+
+            dist.init_process_group(backend)
+            self.local_rank = dist.get_rank()
+            torch.cuda.set_device(self.local_rank)
+        else:
+            self.local_rank = 0
         print("Loading dataset")
         self.dataset_dict = self.fetch_dataset()
+        print("Loading model")
+        self.model, self.tokenizer = self.load_model()
 
     def load_model(self) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
         """Load the model from HuggingFace Hub or S3."""
@@ -63,26 +74,7 @@ class TrainingJobRunner:
                     print("Your GPU supports bfloat16: accelerate training with bf16=True")
                     print("=" * 80)
 
-        print("Is Distributed: ", self.is_distributed)
-        if not self.is_distributed:
-            device_map = {"": 0}
-        else:
-            import torch.distributed as dist
-
-            def setup_distributed(backend: str = "nccl") -> Any:
-                # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
-                dist.init_process_group(backend)
-                local_rank = dist.get_rank()
-                torch.cuda.set_device(local_rank)
-                return local_rank
-
-            # Assuming the local_rank is set by your distributed training launcher
-            # If not, you will need to pass or determine it manually
-            local_rank = setup_distributed()
-
-            # Set the device map to use the GPU corresponding to the local rank
-            device_map = {"": local_rank}  # The key '0' refers to the main module of the model
-
+        device_map = {"": self.local_rank if self.is_distributed else 0}
         print("Device map: ", device_map)
 
         if self.training_job.base.type == "huggingface":
@@ -128,144 +120,167 @@ class TrainingJobRunner:
 
     def fetch_dataset(self) -> DatasetDict:
         """Fetch the dataset from HuggingFace Hub or S3."""
-        splits = {}
-        bos_token = self.tokenizer.bos_token
-        eos_token = self.tokenizer.eos_token
-        if self.training_job.dataset.type == "huggingface":
-            splits["train"] = Dataset.from_generator(
-                dataset_generator,
-                gen_kwargs={
-                    "dataset": self.training_job.dataset.name,
-                    "split": "train",
-                    "task": self.training_job.task,
-                    "bos_token": bos_token,
-                    "eos_token": eos_token,
-                },
-            )
-            try:
-                splits["val"] = Dataset.from_generator(
-                    dataset_generator,
-                    gen_kwargs={
-                        "dataset": self.training_job.dataset.name,
-                        "split": "val",
-                        "task": self.training_job.task,
-                        "bos_token": bos_token,
-                        "eos_token": eos_token,
-                    },
-                )
-            except:  # pylint: disable=bare-except  # noqa: E722
-                print("Unable to create val dataset")
-            try:
-                splits["test"] = Dataset.from_generator(
-                    dataset_generator,
-                    gen_kwargs={
-                        "dataset": self.training_job.dataset.name,
-                        "split": "test",
-                        "task": self.training_job.task,
-                        "bos_token": bos_token,
-                        "eos_token": eos_token,
-                    },
-                )
-            except:  # pylint: disable=bare-except  # noqa: E722
-                print("Unable to create test dataset")
-        elif self.training_job.dataset.type == "s3":
-            os.makedirs(DATASET_DIR)
-            dataset_mover = DatasetMover()
-            # If the dataset is s3, download it to the local directory
-            # The path would look like bucket_name/path/to/dataset_name.tar.gz
-            # local_name would then be = path/to/dataset_name.tar.gz
-            local_name = self.training_job.dataset.name[self.training_job.dataset.name.find("/") + 1 :]
-            dataset_mover.download(
-                bucket_name=self.training_job.dataset.name.split("/")[0],
-                object_name=f"{local_name}.tar.gz",
-                output_folder_path=DATASET_DIR,
-            )
-            print(os.listdir(DATASET_DIR))
-            print(os.listdir(f"{DATASET_DIR}/{local_name}"))
-            splits["train"] = Dataset.from_generator(
-                dataset_generator,
-                gen_kwargs={
-                    "dataset": f"{DATASET_DIR}/{local_name}",
-                    "split": "train",
-                    "from_disk": True,
-                    "task": self.training_job.task,
-                    "bos_token": bos_token,
-                    "eos_token": eos_token,
-                },
-            )
-            try:
-                splits["val"] = Dataset.from_generator(
-                    dataset_generator,
-                    gen_kwargs={
-                        "dataset": f"{DATASET_DIR}/{local_name}",
-                        "split": "val",
-                        "from_disk": True,
-                        "task": self.training_job.task,
-                        "bos_token": bos_token,
-                        "eos_token": eos_token,
-                    },
-                )
-            except:  # pylint: disable=bare-except  # noqa: E722
-                print("Unable to create val dataset")
-            try:
-                splits["test"] = Dataset.from_generator(
-                    dataset_generator,
-                    gen_kwargs={
-                        "dataset": f"{DATASET_DIR}/{local_name}",
-                        "split": "test",
-                        "from_disk": True,
-                        "task": self.training_job.task,
-                        "bos_token": bos_token,
-                        "eos_token": eos_token,
-                    },
-                )
-            except:  # pylint: disable=bare-except  # noqa: E722
-                print("Unable to create test dataset")
-        elif self.training_job.dataset.type == "local":
-            print("Loading dataset locally: ", os.listdir(self.training_job.dataset.path))
-            splits["train"] = Dataset.from_generator(
-                dataset_generator,
-                gen_kwargs={
-                    "dataset": self.training_job.dataset.path,
-                    "split": "train",
-                    "from_disk": True,
-                    "task": self.training_job.task,
-                    "bos_token": bos_token,
-                    "eos_token": eos_token,
-                },
-            )
-            try:
-                splits["val"] = Dataset.from_generator(
-                    dataset_generator,
-                    gen_kwargs={
-                        "dataset": self.training_job.dataset.path,
-                        "split": "val",
-                        "from_disk": True,
-                        "task": self.training_job.task,
-                        "bos_token": bos_token,
-                        "eos_token": eos_token,
-                    },
-                )
-            except:  # pylint: disable=bare-except  # noqa: E722
-                print("Unable to create val dataset")
-            try:
-                splits["test"] = Dataset.from_generator(
-                    dataset_generator,
-                    gen_kwargs={
-                        "dataset": self.training_job.dataset.path,
-                        "split": "test",
-                        "from_disk": True,
-                        "task": self.training_job.task,
-                        "bos_token": bos_token,
-                        "eos_token": eos_token,
-                    },
-                )
-            except:  # pylint: disable=bare-except  # noqa: E722
-                print("Unable to create test dataset")
-        else:
+        if self.training_job.dataset.type not in ["huggingface", "s3", "local"]:
             raise ValueError(f"Unknown dataset_type: {self.training_job.dataset.type}")
 
-        return DatasetDict(splits)
+        if not os.path.exists(DATASET_DIR):
+            os.makedirs(DATASET_DIR)
+        if self.local_rank > 0:
+            while not os.path.exists(f"{DATASET_DIR}/data_ready.txt") and not os.path.exists(
+                f"{DATASET_DIR}/data_abort.txt"
+            ):
+                time.sleep(5)
+                print(f"LOCAL RANK {self.local_rank}: Waiting for data to be ready")
+            if os.path.exists(f"{DATASET_DIR}/data_abort.txt"):
+                print(f"LOCAL RANK {self.local_rank}: Data Abort")
+                raise Exception("Data Abort")
+            else:
+                print(f"LOCAL RANK {self.local_rank}: Data ready")
+
+        try:
+            splits = {}
+            bos_token = self.tokenizer.bos_token
+            eos_token = self.tokenizer.eos_token
+            if self.training_job.dataset.type == "huggingface":
+                splits["train"] = Dataset.from_generator(
+                    dataset_generator,
+                    gen_kwargs={
+                        "dataset": self.training_job.dataset.name,
+                        "split": "train",
+                        "task": self.training_job.task,
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+                try:
+                    splits["val"] = Dataset.from_generator(
+                        dataset_generator,
+                        gen_kwargs={
+                            "dataset": self.training_job.dataset.name,
+                            "split": "val",
+                            "task": self.training_job.task,
+                            "bos_token": bos_token,
+                            "eos_token": eos_token,
+                        },
+                    )
+                except:  # pylint: disable=bare-except  # noqa: E722
+                    print("Unable to create val dataset")
+                try:
+                    splits["test"] = Dataset.from_generator(
+                        dataset_generator,
+                        gen_kwargs={
+                            "dataset": self.training_job.dataset.name,
+                            "split": "test",
+                            "task": self.training_job.task,
+                            "bos_token": bos_token,
+                            "eos_token": eos_token,
+                        },
+                    )
+                except:  # pylint: disable=bare-except  # noqa: E722
+                    print("Unable to create test dataset")
+            elif self.training_job.dataset.type == "s3":
+                dataset_mover = DatasetMover()
+                # If the dataset is s3, download it to the local directory
+                # The path would look like bucket_name/path/to/dataset_name.tar.gz
+                # local_name would then be = path/to/dataset_name.tar.gz
+                local_name = self.training_job.dataset.name[self.training_job.dataset.name.find("/") + 1 :]
+                dataset_mover.download(
+                    bucket_name=self.training_job.dataset.name.split("/")[0],
+                    object_name=f"{local_name}.tar.gz",
+                    output_folder_path=DATASET_DIR,
+                )
+                print(os.listdir(DATASET_DIR))
+                print(os.listdir(f"{DATASET_DIR}/{local_name}"))
+                splits["train"] = Dataset.from_generator(
+                    dataset_generator,
+                    gen_kwargs={
+                        "dataset": f"{DATASET_DIR}/{local_name}",
+                        "split": "train",
+                        "from_disk": True,
+                        "task": self.training_job.task,
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+                try:
+                    splits["val"] = Dataset.from_generator(
+                        dataset_generator,
+                        gen_kwargs={
+                            "dataset": f"{DATASET_DIR}/{local_name}",
+                            "split": "val",
+                            "from_disk": True,
+                            "task": self.training_job.task,
+                            "bos_token": bos_token,
+                            "eos_token": eos_token,
+                        },
+                    )
+                except:  # pylint: disable=bare-except  # noqa: E722
+                    print("Unable to create val dataset")
+                try:
+                    splits["test"] = Dataset.from_generator(
+                        dataset_generator,
+                        gen_kwargs={
+                            "dataset": f"{DATASET_DIR}/{local_name}",
+                            "split": "test",
+                            "from_disk": True,
+                            "task": self.training_job.task,
+                            "bos_token": bos_token,
+                            "eos_token": eos_token,
+                        },
+                    )
+                except:  # pylint: disable=bare-except  # noqa: E722
+                    print("Unable to create test dataset")
+
+            elif self.training_job.dataset.type == "local":
+                print("Loading dataset locally: ", os.listdir(self.training_job.dataset.path))
+                splits["train"] = Dataset.from_generator(
+                    dataset_generator,
+                    gen_kwargs={
+                        "dataset": self.training_job.dataset.path,
+                        "split": "train",
+                        "from_disk": True,
+                        "task": self.training_job.task,
+                        "bos_token": bos_token,
+                        "eos_token": eos_token,
+                    },
+                )
+                try:
+                    splits["val"] = Dataset.from_generator(
+                        dataset_generator,
+                        gen_kwargs={
+                            "dataset": self.training_job.dataset.path,
+                            "split": "val",
+                            "from_disk": True,
+                            "task": self.training_job.task,
+                            "bos_token": bos_token,
+                            "eos_token": eos_token,
+                        },
+                    )
+                except:  # pylint: disable=bare-except  # noqa: E722
+                    print("Unable to create val dataset")
+                try:
+                    splits["test"] = Dataset.from_generator(
+                        dataset_generator,
+                        gen_kwargs={
+                            "dataset": self.training_job.dataset.path,
+                            "split": "test",
+                            "from_disk": True,
+                            "task": self.training_job.task,
+                            "bos_token": bos_token,
+                            "eos_token": eos_token,
+                        },
+                    )
+                except:  # pylint: disable=bare-except  # noqa: E722
+                    print("Unable to create test dataset")
+
+            print("Loaded dataset")
+            with open(f"{DATASET_DIR}/data_ready.txt", "w") as f:
+                f.write("Data Ready")
+            return DatasetDict(splits)
+        except:  # pylint: disable=bare-except  # noqa: E722
+            print("Unable to load dataset")
+            with open(f"{DATASET_DIR}/data_abort.txt", "w") as f:
+                f.write("Data Abort")
 
     def freeze(self) -> None:
         """Freeze the model layers for SFT without PEFT."""
