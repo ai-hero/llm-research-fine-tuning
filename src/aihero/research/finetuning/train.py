@@ -41,10 +41,10 @@ class TrainingJobRunner:
             torch.cuda.set_device(self.local_rank)
         else:
             self.local_rank = 0
-        print("Loading dataset")
-        self.dataset_dict = self.fetch_dataset()
         print("Loading model")
         self.model, self.tokenizer = self.load_model()
+        print("Loading dataset")  # After model for tokenizer load to work
+        self.dataset_dict = self.fetch_dataset()
 
     def load_model(self) -> Tuple[AutoModelForCausalLM, AutoTokenizer]:
         """Load the model from HuggingFace Hub or S3."""
