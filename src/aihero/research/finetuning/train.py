@@ -25,10 +25,10 @@ if os.environ.get("HF_TOKEN", None):
 class TrainingJobRunner:
     """Class to run a training job."""
 
-    def __init__(self, training_job: TrainingJob):
+    def __init__(self, training_job: TrainingJob, is_distributed: bool = False):
         """Initialize the training job runner."""
         self.training_job = training_job
-
+        self.is_distributed = is_distributed
         print("Loading model")
         self.model, self.tokenizer = self.load_model()
         print("Loading dataset")
@@ -64,7 +64,19 @@ class TrainingJobRunner:
                     print("=" * 80)
 
         if self.training_job.base.type == "huggingface":
-            device_map = {"": 0}
+            if not self.is_distributed:
+                device_map = {"": 0}
+            else:
+                import torch.distributed as dist
+
+                # Assuming the local_rank is set by your distributed training launcher
+                # If not, you will need to pass or determine it manually
+                local_rank = dist.get_rank()
+
+                # Set the device map to use the GPU corresponding to the local rank
+                device_map = {"": local_rank}  # The key '0' refers to the main module of the model
+
+            print("Device map: ", device_map)
 
             if use_4bit:
                 # Load base model

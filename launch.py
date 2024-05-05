@@ -1,4 +1,6 @@
 """run script for fine-tuning a model."""
+import os
+
 from aihero.research.config.schema import BatchInferenceJob, TrainingJob
 from aihero.research.finetuning.infer import BatchInferenceJobRunner
 from aihero.research.finetuning.train import TrainingJobRunner
@@ -7,7 +9,7 @@ from fire import Fire
 
 def train(training_config_file: str = "/mnt/config/training/config.yaml") -> None:
     """Run Training."""
-    training_config = TrainingJob.load(training_config_file)
+    training_config = TrainingJob.load(training_config_file, is_distributed=int(os.getenv("WORLD_SIZE", 1)) > 1)
     TrainingJobRunner(training_config).run()
 
 
