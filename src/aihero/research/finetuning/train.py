@@ -136,7 +136,7 @@ class TrainingJobRunner:
                 raise Exception("Data Abort")
             else:
                 print(f"LOCAL RANK {self.local_rank}: Data ready")
-
+        print(f"LOCAL RANK {self.local_rank}: loading data")
         try:
             splits = {}
             bos_token = self.tokenizer.bos_token
@@ -273,7 +273,7 @@ class TrainingJobRunner:
                 except:  # pylint: disable=bare-except  # noqa: E722
                     print("Unable to create test dataset")
 
-            print("Loaded dataset")
+            print(f"LOCAL RANK {self.local_rank}: data loaded")
             with open(f"{DATASET_DIR}/data_ready.txt", "w") as f:
                 f.write("Data Ready")
             return DatasetDict(splits)
