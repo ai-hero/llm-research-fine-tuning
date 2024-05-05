@@ -126,13 +126,21 @@ class TrainingJobRunner:
         if not os.path.exists(DATASET_DIR):
             os.makedirs(DATASET_DIR)
         if self.local_rank > 0:
-            while not os.path.exists(f"{DATASET_DIR}/data_ready.txt"):
+            while not os.path.exists(f"{DATASET_DIR}/downloading_data.txt"):
+                print(f"LOCAL RANK {self.local_rank}: Waiting for data download to begin")
+                time.sleep(5)
+
+            while os.path.exists(f"{DATASET_DIR}/downloading_data.txt"):
                 print(f"LOCAL RANK {self.local_rank}: Waiting for data to be ready")
                 time.sleep(5)
-                if os.path.exists(f"{DATASET_DIR}/data_abort.txt"):
-                    print(f"LOCAL RANK {self.local_rank}: Data Abort")
-                    raise Exception("Data Abort")
+
+            if os.path.exists(f"{DATASET_DIR}/data_abort.txt"):
+                print(f"LOCAL RANK {self.local_rank}: Data Abort")
+                raise Exception("Data Abort")
             print(f"LOCAL RANK {self.local_rank}: Data ready")
+        else:
+            with open(f"{DATASET_DIR}/downloading_data.txt", "w") as f:
+                f.write("Downloading Data")
         print(f"LOCAL RANK {self.local_rank}: loading data")
         try:
             splits = {}
@@ -271,8 +279,7 @@ class TrainingJobRunner:
                     print("Unable to create test dataset")
 
             print(f"LOCAL RANK {self.local_rank}: data loaded")
-            with open(f"{DATASET_DIR}/data_ready.txt", "w") as f:
-                f.write("Data Ready")
+            os.remove(f"{DATASET_DIR}/downloading_data.txt")
             return DatasetDict(splits)
         except:  # pylint: disable=bare-except  # noqa: E722
             print("Unable to load dataset")
