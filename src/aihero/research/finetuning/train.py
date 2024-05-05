@@ -280,7 +280,8 @@ class TrainingJobRunner:
                     print("Unable to create test dataset")
 
             print(f"LOCAL RANK {self.local_rank}: data loaded")
-            os.remove(f"{DATASET_DIR}/downloading_data.txt")
+            if os.path.exists(f"{DATASET_DIR}/downloading_data.txt"):
+                os.remove(f"{DATASET_DIR}/downloading_data.txt")
             return DatasetDict(splits)
         except:  # pylint: disable=bare-except  # noqa: E722
             traceback.print_exc()
