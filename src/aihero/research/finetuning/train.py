@@ -63,21 +63,29 @@ class TrainingJobRunner:
                     print("Your GPU supports bfloat16: accelerate training with bf16=True")
                     print("=" * 80)
 
-        if self.training_job.base.type == "huggingface":
-            if not self.is_distributed:
-                device_map = {"": 0}
-            else:
-                import torch.distributed as dist
+        print("Is Distributed: ", self.is_distributed)
+        if not self.is_distributed:
+            device_map = {"": 0}
+        else:
+            import torch.distributed as dist
 
-                # Assuming the local_rank is set by your distributed training launcher
-                # If not, you will need to pass or determine it manually
+            def setup_distributed(backend: str = "nccl") -> Any:
+                # Initializes the distributed backend which will take care of sychronizing nodes/GPUs
+                dist.init_process_group(backend)
                 local_rank = dist.get_rank()
+                torch.cuda.set_device(local_rank)
+                return local_rank
 
-                # Set the device map to use the GPU corresponding to the local rank
-                device_map = {"": local_rank}  # The key '0' refers to the main module of the model
+            # Assuming the local_rank is set by your distributed training launcher
+            # If not, you will need to pass or determine it manually
+            local_rank = setup_distributed()
 
-            print("Device map: ", device_map)
+            # Set the device map to use the GPU corresponding to the local rank
+            device_map = {"": local_rank}  # The key '0' refers to the main module of the model
 
+        print("Device map: ", device_map)
+
+        if self.training_job.base.type == "huggingface":
             if use_4bit:
                 # Load base model
                 model = AutoModelForCausalLM.from_pretrained(
