@@ -190,11 +190,12 @@ class TrainingJobRunner:
                 # The path would look like bucket_name/path/to/dataset_name.tar.gz
                 # local_name would then be = path/to/dataset_name.tar.gz
                 local_name = self.training_job.dataset.name[self.training_job.dataset.name.find("/") + 1 :]
-                dataset_mover.download(
-                    bucket_name=self.training_job.dataset.name.split("/")[0],
-                    object_name=f"{local_name}.tar.gz",
-                    output_folder_path=DATASET_DIR,
-                )
+                if not os.path.exists(f"{DATASET_DIR}/{local_name}"):
+                    dataset_mover.download(
+                        bucket_name=self.training_job.dataset.name.split("/")[0],
+                        object_name=f"{local_name}.tar.gz",
+                        output_folder_path=DATASET_DIR,
+                    )
                 print(os.listdir(DATASET_DIR))
                 print(os.listdir(f"{DATASET_DIR}/{local_name}"))
                 splits["train"] = Dataset.from_generator(
@@ -285,7 +286,8 @@ class TrainingJobRunner:
             return DatasetDict(splits)
         except:  # pylint: disable=bare-except  # noqa: E722
             traceback.print_exc()
-            os.remove(f"{DATASET_DIR}/downloading_data.txt")
+            if os.path.exists(f"{DATASET_DIR}/downloading_data.txt"):
+                os.remove(f"{DATASET_DIR}/downloading_data.txt")
             print("Unable to load dataset")
             with open(f"{DATASET_DIR}/data_abort.txt", "w") as f:
                 f.write("Data Abort")
