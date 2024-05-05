@@ -126,16 +126,13 @@ class TrainingJobRunner:
         if not os.path.exists(DATASET_DIR):
             os.makedirs(DATASET_DIR)
         if self.local_rank > 0:
-            while not os.path.exists(f"{DATASET_DIR}/data_ready.txt") and not os.path.exists(
-                f"{DATASET_DIR}/data_abort.txt"
-            ):
-                time.sleep(5)
+            while not os.path.exists(f"{DATASET_DIR}/data_ready.txt"):
                 print(f"LOCAL RANK {self.local_rank}: Waiting for data to be ready")
-            if os.path.exists(f"{DATASET_DIR}/data_abort.txt"):
-                print(f"LOCAL RANK {self.local_rank}: Data Abort")
-                raise Exception("Data Abort")
-            else:
-                print(f"LOCAL RANK {self.local_rank}: Data ready")
+                time.sleep(5)
+                if os.path.exists(f"{DATASET_DIR}/data_abort.txt"):
+                    print(f"LOCAL RANK {self.local_rank}: Data Abort")
+                    raise Exception("Data Abort")
+            print(f"LOCAL RANK {self.local_rank}: Data ready")
         print(f"LOCAL RANK {self.local_rank}: loading data")
         try:
             splits = {}
