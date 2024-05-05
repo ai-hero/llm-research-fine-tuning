@@ -1,6 +1,6 @@
 """Launch the training job inside a container."""
 import os
-from typing import Any, Optional, Tuple
+from typing import Any, Tuple
 
 import torch
 from datasets import Dataset, DatasetDict
@@ -25,14 +25,9 @@ if os.environ.get("HF_TOKEN", None):
 class TrainingJobRunner:
     """Class to run a training job."""
 
-    def __init__(self, training_job: TrainingJob, distributed_config: Optional[dict[str, Any]] = None):
+    def __init__(self, training_job: TrainingJob):
         """Initialize the training job runner."""
         self.training_job = training_job
-        if distributed_config:
-            self.distributed_config = distributed_config
-            print("Training LOCAL RANK: {} ...".format(os.getenv("LOCAL_RANK", "Unknown")))
-            print("Training RANK: {} ...".format(os.getenv("RANK", "Unknown")))
-            print("Training LOCAL WORLD SIZE: {} ...".format(os.getenv("LOCAL_WORLD_SIZE", "Unknown")))
 
         print("Loading model")
         self.model, self.tokenizer = self.load_model()
