@@ -14,7 +14,7 @@ def train(training_config_file: str = "/mnt/config/training/config.yaml", distri
             distributed_training_config = yaml.safe_load(f)
     else:
         distributed_training_config = ""
-    TrainingJobRunner(training_config, distributed_training_config=distributed_training_config).run()
+    TrainingJobRunner(training_config, distributed_config=distributed_training_config).run()
 
 
 def infer(batch_inference_config_file: str = "/mnt/config/batch_inference/config.yaml") -> None:
