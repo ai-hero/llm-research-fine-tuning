@@ -20,19 +20,11 @@ jobs:
         id: short_sha
         run: |
           echo "SHORT_SHA=$(git rev-parse --short ${{ github.sha }})" >> $GITHUB_ENV
-      - name: Build and push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: rparundekar/fine_tune_research:${{ env.SHORT_SHA }}
-          cache-from: type=registry,ref=rparundekar/fine_tune_research:buildcache
-          cache-to: type=registry,ref=rparundekar/fine_tune_research:buildcache,mode=max
-      # - name: Build and push
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: .
-      #     push: true
-      #     tags: aihero/${{ github.event.repository.name }}:${{ env.SHORT_SHA }}
-      #     cache-from: type=registry,ref=aihero/${{ github.event.repository.name }}:buildcache
-      #     cache-to: type=registry,ref=aihero/${{ github.event.repository.name }}:buildcache,mode=max
+          - name: Build and push
+          uses: docker/build-push-action@v5
+          with:
+            context: .
+            push: true
+            tags: aihero/${{ github.event.repository.name }}:${{ env.SHORT_SHA }}
+            cache-from: type=registry,ref=aihero/${{ github.event.repository.name }}:buildcache
+            cache-to: type=registry,ref=aihero/${{ github.event.repository.name }}:buildcache,mode=max
