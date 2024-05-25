@@ -294,7 +294,9 @@ class BatchInferenceWithEval:
         """Generate a completion from a prompt."""
         tokenized_prompt = self.tokenizer(prompt, return_tensors="pt", padding=True)["input_ids"].cuda()
         with torch.inference_mode():
-            output = self.model.generate(inputs=tokenized_prompt, generation_config=self.gen_config)
+            output = self.model.generate(
+                inputs=tokenized_prompt, generation_config=self.gen_config, pad_token_id=self.tokenizer.eos_token_id
+            )
         return self.tokenizer.decode(output[0][len(tokenized_prompt[0]) :], skip_special_tokens=True)
 
     def run_initial_predictions(self, rows: Dataset) -> Tuple[list[dict[str, Any]], Tuple[Table, dict[str, Any]]]:
