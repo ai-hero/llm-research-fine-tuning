@@ -33,7 +33,7 @@ dependencies = [
     "trl==0.7.7",
     "types-PyYAML==6.0.12.12",
     "wandb==0.15.12",
-    ""jsonschema",
+    "jsonschema",
 ]
 
 [project.optional-dependencies]
