@@ -16,8 +16,7 @@ from aihero.research.finetuning.utils import DatasetMover, dataset_generator
 
 CHECKPOINT_DIR = "/mnt/checkpoint"
 DATASET_DIR = "/mnt/dataset"
-MAX_NEW_TOKENS = 512
-
+MAX_NEW_TOKENS = 7680
 if os.environ.get("HF_TOKEN", None):
     login(token=os.environ["HF_TOKEN"])
 
