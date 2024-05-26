@@ -41,7 +41,10 @@ class LLMSampleCB(WandbCallback):  # type: ignore
         # Sample a few rows from the test split to generate a table of predictions
         # for visual inspection a.k.a. spot checking
         # Randomly select indices for the samples
-        selected_indices = random.sample(range(test_split.num_rows), num_samples)
+        if num_samples >= test_split.num_rows:
+            selected_indices = list(range(0, test_split.num_rows))
+        else:
+            selected_indices = random.sample(range(test_split.num_rows), num_samples)
         # Retrieve the selected samples from the dataset
         test_split_list = list(test_split)
         self.sample_split = []

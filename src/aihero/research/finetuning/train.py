@@ -403,7 +403,7 @@ class TrainingJobRunner:
                     trainer,
                     task,
                     test_split,
-                    num_samples=100,
+                    num_samples=test_split.num_rows if test_split.num_rows < 100 else 100,
                     max_new_tokens=self.training_job.trainer.max_seq_length,
                     run_tests_str=run_tests_str,
                     run_metrics_str=run_metrics_str,
